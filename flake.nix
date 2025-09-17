@@ -7,8 +7,6 @@
     supportedSystems = [
       "x86_64-linux" # 64-bit Intel/AMD Linux
       "aarch64-linux" # 64-bit ARM Linux
-      "x86_64-darwin" # 64-bit Intel macOS
-      "aarch64-darwin" # 64-bit ARM macOS
     ];
 
     forEachSupportedSystem = f:
@@ -37,5 +35,26 @@
         };
       }
     );
+
+    packages = forEachSupportedSystem ({pkgs}: {
+      default = pkgs.stdenv.mkDerivation rec {
+        name = "crynth";
+        src = ./.;
+        buildInputs = with pkgs; [
+          raylib
+          alsa-lib
+        ];
+
+        buildPhase = ''
+          cc -o nob nob.c
+          ./nob
+        '';
+
+        installPhase = ''
+          mkdir -p $out/usr/bin
+          cp ./build/crynth $out/usr/bin
+        '';
+      };
+    });
   };
 }
