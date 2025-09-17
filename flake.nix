@@ -51,8 +51,8 @@
         '';
 
         installPhase = ''
-          mkdir -p $out/usr/bin
-          cp ./build/crynth $out/usr/bin
+          mkdir -p $out/bin
+          cp ./build/crynth $out/bin
         '';
       };
     });
