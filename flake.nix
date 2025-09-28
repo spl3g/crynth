@@ -21,9 +21,9 @@
       {pkgs}: {
         default = pkgs.mkShell {
           packages = with pkgs; [
-            gcc
+            clang
             stdenv.cc
-            gdb
+            lldb
 
             man-pages
             man-pages-posix
