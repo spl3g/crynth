@@ -1,4 +1,8 @@
 # *CR*appy s*YNTH*
+> [!WARNING]
+> This software is unfinished. Keep your expectations low.  
+> Right now you can play some notes with it by pressing keys on the bottom row of your keyboard
+
 Just a crappy synth using alsa and raylib. Works only on linux.
 
 ## Building
