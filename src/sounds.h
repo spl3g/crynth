@@ -2,20 +2,20 @@
 #define SOUNDS_H_
 
 #include <alsa/asoundlib.h>
+#include <limits.h>
 #include <math.h>
 #include <pthread.h>
 #include <stdbool.h>
-#include <limits.h>
 
-#define check(ret)                                                          \
-	do {                                                                    \
-		int res = (ret);                                                    \
-		if (res < 0) {                                                      \
-			fprintf(stderr, "%s:%d ERROR: %s (%d)\n",                       \
-				__FILE__, __LINE__, snd_strerror(res), res);                \
-			exit(1);                                                        \
-		}                                                                   \
-	} while (0)
+#define check(ret)                                                             \
+  do {                                                                         \
+    int res = (ret);                                                           \
+    if (res < 0) {                                                             \
+      fprintf(stderr, "%s:%d ERROR: %s (%d)\n", __FILE__, __LINE__,            \
+              snd_strerror(res), res);                                         \
+      exit(1);                                                                 \
+    }                                                                          \
+  } while (0)
 
 #define MESSAGE_QUEUE_SIZE 128
 #define SAMPLE_RATE 48000
@@ -45,19 +45,18 @@ typedef struct {
   synth_message_type type;
 
   union {
-	// NOTE_ON / NOTE_OFF
-	struct {
-	  size_t note_id;
-	} note;
+    // NOTE_ON / NOTE_OFF
+    struct {
+      size_t note_id;
+    } note;
 
-	// SET_PARAM;
-	struct {
-	  param_type param_type;
-	  float value;
-	} param_change;
+    // SET_PARAM;
+    struct {
+      param_type param_type;
+      float value;
+    } param_change;
   };
 } synth_message;
-
 
 typedef struct {
   synth_message buffer[MESSAGE_QUEUE_SIZE];
@@ -71,11 +70,30 @@ typedef struct {
   message_queue *queue;
 } sound_thread_meta;
 
+typedef enum {
+  ENV_OFF,
+  ENV_ATTACK,
+  ENV_DECAY,
+  ENV_SUSTAIN,
+  ENV_RELEASE,
+} envelope_state;
+
+typedef struct {
+  envelope_state state;
+  int counter;
+  int attack_time;
+  int decay_time;
+  float sustain_level;
+  int release_time;
+  float increases[3];
+} envelope;
+
 typedef struct {
   bool active;
   float freq;
   float phase;
   float phase_inc;
+  envelope envelope;
 } synth_voice;
 
 typedef struct {
@@ -88,30 +106,16 @@ typedef struct {
   float master_volume;
 } synth_params;
 
-typedef void (*oscilator_func)(float *buffer, size_t sample_count, float *phase, float phase_inc);
+typedef float (*oscilator_func)(float phase);
 
-#define mqueue_init(q) \
-  do { \
-    (q)->head = (q)->tail = 0; \
-    pthread_mutex_init(&(q)->lock, NULL); \
+int mqueue_get(message_queue *q, synth_message *msg);
+int mqueue_push(message_queue *q, synth_message msg);
+
+#define mqueue_init(q)                                                         \
+  do {                                                                         \
+    (q)->head = (q)->tail = 0;                                                 \
+    pthread_mutex_init(&(q)->lock, NULL);                                      \
   } while (0)
-
-
-#define mqueue_push(q, msg) \
-  do { \
-	pthread_mutex_lock(&(q)->lock); \
-	size_t next = ((q)->head + 1) % MESSAGE_QUEUE_SIZE; \
-	 \
-	if ((q)->tail == next) { \
-	  pthread_mutex_unlock(&(q)->lock); \
-	  return 1; \
-	} \
-	 \
-	(q)->buffer[(q)->head] = msg; \
-	(q)->head = next; \
-	 \
-	pthread_mutex_unlock(&(q)->lock); \
-  } while (0) \
 
 /* #define mqueue_get(q, msg, ok) \ */
 /*   do { \ */
