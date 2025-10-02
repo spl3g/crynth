@@ -5,10 +5,11 @@
 
 #define BUILD_FOLDER "build/"
 #define SRC_FOLDER "src/"
+#define THIRD_PARTY_FOLDER "third-party/"
 
-#define nob_cc_include_path(cmd, path)                                         \
-  cmd_append(cmd, temp_sprintf("-I%s", path))
+#define nob_cc_include_path(cmd, path) cmd_append(cmd, temp_sprintf("-I%s", path))
 #define nob_cc_no_link(cmd) cmd_append(cmd, "-c")
+#define nob_cc_my_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra")
 
 typedef struct {
   Nob_String_View *items;
@@ -18,9 +19,9 @@ typedef struct {
 
 bool build_object(Cmd *cmd, const char *src_path, const char *o_path) {
   nob_cc(cmd);
-  nob_cc_flags(cmd);
-  nob_cmd_append(cmd, "-ggdb");
+  nob_cc_my_flags(cmd);
   nob_cc_include_path(cmd, SRC_FOLDER);
+  nob_cc_include_path(cmd, THIRD_PARTY_FOLDER);
   nob_cc_inputs(cmd, src_path);
   nob_cc_no_link(cmd);
   nob_cc_output(cmd, o_path);
@@ -77,8 +78,7 @@ int main(int argc, char **argv) {
     return 1;
 
   nob_cc(&cmd);
-  nob_cc_flags(&cmd);
-  nob_cmd_append(&cmd, "-ggdb");
+  nob_cc_my_flags(&cmd);
   nob_cc_include_path(&cmd, SRC_FOLDER);
 
   for (int i = 0; i < filenames.count; i++) {
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     nob_cmd_append(&cmd, input_sb.items);
   }
 
-  nob_cmd_append(&cmd, "-lm", "-lasound", "-lraylib");
+  nob_cmd_append(&cmd, "-lm", "-lasound", "-lSDL3");
   nob_cc_output(&cmd, BUILD_FOLDER "crynth");
 
   if (!nob_cmd_run(&cmd))

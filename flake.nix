@@ -30,7 +30,9 @@
 
             alsa-lib
 
-            raylib
+            sdl3
+            sdl3-ttf
+            sdl3-image
           ];
         };
       }
@@ -41,7 +43,7 @@
         name = "crynth";
         src = ./.;
         buildInputs = with pkgs; [
-          raylib
+          sdl3
           alsa-lib
         ];
 
