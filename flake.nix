@@ -43,8 +43,11 @@
         name = "crynth";
         src = ./.;
         buildInputs = with pkgs; [
-          sdl3
           alsa-lib
+
+          sdl3
+          sdl3-ttf
+          sdl3-image
         ];
 
         buildPhase = ''

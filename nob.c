@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     nob_cmd_append(&cmd, input_sb.items);
   }
 
-  nob_cmd_append(&cmd, "-lm", "-lasound", "-lSDL3");
+  nob_cmd_append(&cmd, "-lm", "-lasound", "-lSDL3", "-lSDL3_ttf");
   nob_cc_output(&cmd, BUILD_FOLDER "crynth");
 
   if (!nob_cmd_run(&cmd))

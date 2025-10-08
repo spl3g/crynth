@@ -2,18 +2,25 @@
 #include <pthread.h>
 #include <stdio.h>
 
-#include "clay/clay.h"
-
-#define SDL_MAIN_USE_CALLBACKS 1
+#define SDL_MAIN_USE_CALLBACKS
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_keycode.h>
 
+#define CLAY_IMPLEMENTATION
+#include "clay/clay.h"
+#include "clay/renderers/clay_renderer_SDL3.c"
+
 #include "sounds.h"
 
-const int SCREEN_FPS = 60;
-const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
+static const int SCREEN_FPS = 60;
+static const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
+
+static const int FONT_ID = 0;
+
+static const Clay_Color COLOR_BG = (Clay_Color){45, 53, 59, 255};
+static const Clay_Color COLOR_FG = (Clay_Color){211, 198, 170, 255};
 
 typedef struct {
   char key;
@@ -22,7 +29,8 @@ typedef struct {
 
 typedef struct {
   SDL_Window *window;
-  SDL_Renderer *renderer;
+  Clay_SDL3RendererData renderer_data;
+  
   bool last_keys[12];
   
   snd_pcm_t *sound_device;
@@ -78,19 +86,81 @@ int init_sounds(app_state *state) {
   return 0;
 }
 
+static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
+{
+    TTF_Font **fonts = userData;
+    TTF_Font *font = fonts[config->fontId];
+    int width, height;
+
+    TTF_SetFontSize(font, config->fontSize);
+    if (!TTF_GetStringSize(font, text.chars, text.length, &width, &height)) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError());
+    }
+
+    return (Clay_Dimensions) { (float) width, (float) height };
+}
+
+void HandleClayErrors(Clay_ErrorData errorData) {
+    printf("%s", errorData.errorText.chars);
+}
+
+int init_ui(app_state *state) {
+  if (!TTF_Init()) {
+	return 1;
+  }
+
+  if (!SDL_Init(SDL_INIT_VIDEO)) {
+	return 1;
+  }
+
+  if (!SDL_CreateWindowAndRenderer("crynth", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS, &state->window, &state->renderer_data.renderer)) {
+	return 1;
+  }
+
+  SDL_SetWindowResizable(state->window, true);
+
+  state->renderer_data.textEngine = TTF_CreateRendererTextEngine(state->renderer_data.renderer);
+  if (!state->renderer_data.textEngine) {
+	return 1;
+  }
+
+  state->renderer_data.fonts = SDL_calloc(1, sizeof(TTF_Font *));
+  if (!state->renderer_data.fonts) {
+	return 1;
+  }
+
+  TTF_Font *font = TTF_OpenFont("resources/Roboto-Regular.ttf", 24);
+  if (!font) {
+	return 1;
+  }
+
+  state->renderer_data.fonts[FONT_ID] = font;
+
+
+  size_t totalMemorySize = Clay_MinMemorySize();
+  Clay_Arena clayMemory = (Clay_Arena) {
+    .memory = SDL_malloc(totalMemorySize),
+    .capacity = totalMemorySize
+  };
+
+  int width, height;
+  SDL_GetWindowSize(state->window, &width, &height);
+  Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) width, (float) height }, (Clay_ErrorHandler) { HandleClayErrors });
+  Clay_SetMeasureTextFunction(SDL_MeasureText, state->renderer_data.fonts);
+  
+  return 0;
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  
   app_state *state = malloc(sizeof(app_state));
   *appstate = state;
 
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    printf("Couldn't initialize SDL: %s", SDL_GetError());
-    return SDL_APP_FAILURE;
-  }
-
-  if (!SDL_CreateWindowAndRenderer("crynth", 640, 480, 0, &state->window,
-                                   &state->renderer)) {
-    printf("Couldn't create window/renderer: %s", SDL_GetError());
-    return SDL_APP_FAILURE;
+  if (init_ui(state) != 0) {
+	printf("Couldn't initialize UI: %s", SDL_GetError());
+	return SDL_APP_FAILURE;
   }
 
   if (init_sounds(state) != 0) {
@@ -100,25 +170,119 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
   return SDL_APP_CONTINUE;
 }
 
+void draw_white_key(size_t idx, bool pressed) {
+  Clay_Color fill_color;
+  Clay_Color border_color;
+
+  if (pressed) {
+	fill_color = COLOR_BG;
+	border_color = COLOR_FG;
+  } else {
+	fill_color = COLOR_FG;
+	border_color = COLOR_FG;
+  }
+  CLAY(CLAY_IDI("white_key", idx), {
+    .layout = {
+	  .sizing = {CLAY_SIZING_FIXED(40), .height = CLAY_SIZING_FIXED(100)},
+    },
+    .backgroundColor = fill_color,
+    .border = { .width = {1, 1, 1, 1, 0}, .color = border_color},
+  });  
+}
+
+void draw_black_key(size_t idx, bool pressed) {
+  Clay_Color fill_color;
+  Clay_Color border_color;
+
+  if (pressed) {
+	fill_color = COLOR_FG;
+	border_color = COLOR_BG;
+  } else {
+	fill_color = COLOR_BG;
+	border_color = COLOR_FG;
+  }
+  CLAY(CLAY_IDI("black_key", idx), {
+    .layout = {
+	  .sizing = {CLAY_SIZING_FIXED(25), .height = CLAY_SIZING_FIXED(65)},
+    },
+
+	.floating = {
+	  .attachTo = CLAY_ATTACH_TO_ELEMENT_WITH_ID,
+	  .parentId = CLAY_IDI("white_key", idx - 1).id,
+	  .attachPoints = {
+		.element = CLAY_ATTACH_POINT_CENTER_TOP,
+		.parent = CLAY_ATTACH_POINT_RIGHT_TOP,
+	  },
+	  .offset = {
+		.y = -1,
+	  },
+	},
+
+    .backgroundColor = fill_color,
+    .border = { .width = {1, 1, 0, 1, 0}, .color = border_color},
+  });
+}
+
+void draw_keyboard(bool *pressed_keys, size_t keys_amount) {
+  CLAY(CLAY_ID("keyboard"), {
+	  .layout = {
+		.layoutDirection = CLAY_LEFT_TO_RIGHT,
+	  },
+  }) {
+	for (size_t i = 0; i < keys_amount; i++) {
+	  bool pressed = pressed_keys[i];
+	  size_t key_idx = i % 12;
+	  if (key_idx <= 4) {
+		if (i % 2 == 0) {
+		  draw_white_key(i, pressed);
+		} else {
+		  draw_black_key(i, pressed);
+		}
+	  } else {
+		if (i % 2 == 0) {
+		  draw_black_key(i, pressed);
+		} else {
+		  draw_white_key(i, pressed);
+		}
+	  }
+	}
+  }
+}
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
   app_state *state = appstate;
 
   int start_tick = SDL_GetTicks();
-	
-  const double now = ((double)SDL_GetTicks()) / 1000.0;
-  const float red = (float)(0.5 + 0.5 * SDL_sin(now));
-  const float green = (float)(0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 2 / 3));
-  const float blue = (float)(0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 4 / 3));
-  SDL_SetRenderDrawColorFloat(state->renderer, red, green, blue, SDL_ALPHA_OPAQUE_FLOAT);
 
-  SDL_RenderClear(state->renderer);
+  Clay_BeginLayout();
 
-  SDL_RenderPresent(state->renderer);
+  CLAY(CLAY_ID("OuterContainer"), {
+    .layout = {
+	  .sizing = {CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0)},
+	  .padding = CLAY_PADDING_ALL(16),
+	  .childGap = 16,
+	  .childAlignment = {
+		.x = CLAY_ALIGN_X_CENTER,
+		.y = CLAY_ALIGN_Y_CENTER,
+	  },
+	},
+    .backgroundColor = COLOR_BG,
+  }) {
+    draw_keyboard(state->last_keys, 12);
+  };
+  
+  Clay_RenderCommandArray render_commands = Clay_EndLayout();
+
+  SDL_SetRenderDrawColor(state->renderer_data.renderer, 0, 0, 0, 255);
+  SDL_RenderClear(state->renderer_data.renderer);
+
+  SDL_Clay_RenderClayCommands(&state->renderer_data, &render_commands);
+
+  SDL_RenderPresent(state->renderer_data.renderer);
 
   int end_tick = SDL_GetTicks();
   int frame_ticks = end_tick - start_tick;
-  
+
   if (frame_ticks < SCREEN_TICKS_PER_FRAME) {
 	SDL_Delay(SCREEN_TICKS_PER_FRAME - frame_ticks);
   }
@@ -176,12 +340,34 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 	break;
   }
 
-  default: {};
+  case SDL_EVENT_WINDOW_RESIZED:
+	Clay_SetLayoutDimensions((Clay_Dimensions) { (float) event->window.data1, (float) event->window.data2 });
+    break;
+
+  case SDL_EVENT_MOUSE_MOTION:
+    Clay_SetPointerState((Clay_Vector2) { event->motion.x, event->motion.y },
+                         event->motion.state & SDL_BUTTON_LMASK);
+    break;
+
+  case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    Clay_SetPointerState((Clay_Vector2) { event->button.x, event->button.y },
+                         event->button.button == SDL_BUTTON_LEFT);
+    break;
+
+  case SDL_EVENT_MOUSE_WHEEL:
+    Clay_UpdateScrollContainers(true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);
+    break;
+
+
+  default:
+	break;
   }
   return SDL_APP_CONTINUE;
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+  (void) result;
+  
   app_state *state = appstate;
 
   message_queue *queue = &state->msg_queue;
