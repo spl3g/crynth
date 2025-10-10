@@ -14,20 +14,36 @@ int mqueue_get(message_queue *q, synth_message *msg) {
   return 0;
 }
 
-int mqueue_push(message_queue *q, synth_message msg) {
-  pthread_mutex_lock(&(q)->lock);
+int mqueue__push_no_lock(message_queue *q, synth_message msg) {
   size_t next = ((q)->head + 1) % MESSAGE_QUEUE_SIZE;
 
   if ((q)->tail == next) {
-    pthread_mutex_unlock(&(q)->lock);
-    return 1;
+	return 1;
   }
 
   (q)->buffer[(q)->head] = msg;
   (q)->head = next;
-
-  pthread_mutex_unlock(&(q)->lock);
   return 0;
+}
+
+int mqueue_push(message_queue *q, synth_message msg) {
+  pthread_mutex_lock(&(q)->lock);
+  int ret = mqueue__push_no_lock(q, msg);
+  pthread_mutex_unlock(&(q)->lock);
+  return ret;
+}
+
+int mqueue_push_many(message_queue *q, synth_message *msg, size_t count) {
+  pthread_mutex_lock(&(q)->lock);
+  int ret = 0;
+  for (size_t i = 0; i < count; i++) {
+	ret = mqueue__push_no_lock(q, msg[i]);
+	if (ret != 0) {
+	  break;
+	}
+  }
+  pthread_mutex_unlock(&(q)->lock);
+  return ret;
 }
 
 float envelope_next(envelope *env) {
@@ -41,57 +57,59 @@ float envelope_next(envelope *env) {
 	return 0;
   }
   case ENV_ATTACK: {
-	if (env->counter >= env->attack_time) {
+	if (env->counter >= env->params.attack_time) {
 	  next_state = true;
 	}
-	value = env->increases[0] * (float)env->counter;
+
+	if (env->current_value == 0) {
+	  env->current_value = 1.0 / (float)env->params.attack_time;
+	}
+	
+	value = env->current_value * (float)env->counter;
 	break;
   }
   case ENV_DECAY: {
-	if (env->counter >= env->decay_time) {
+	if (env->counter >= env->params.decay_time) {
 	  next_state = true;
 	}
-	value = 1.0 - env->increases[1] * (float)env->counter;
+	if (env->current_value == 0) {
+	  env->current_value = (1.0 - env->params.sustain_level) / (float)env->params.decay_time;
+	}
+	
+	value = 1.0 - env->current_value * (float)env->counter;
 	break;
   }
   case ENV_SUSTAIN: {
-	value = env->sustain_level;
+	value = env->params.sustain_level;
 	break;
   }
   case ENV_RELEASE: {
-	if (env->counter >= env->release_time) {
+	if (env->counter >= env->params.release_time) {
 	  env->state = ENV_OFF;
-	  env->counter = 0;
+	  env->counter = env->current_value = 0;
 	  return 0;
 	}
-	value = env->sustain_level - env->increases[2] * (float)env->counter;
+
+	if (env->current_value == 0) {
+	  env->current_value = env->params.sustain_level / (float)env->params.release_time;
+	}
+	
+	value = env->params.sustain_level - env->current_value * (float)env->counter;
 	break;
   }
   }
 
   if (next_state) {
-	env->counter = 0;
+	env->counter = env->current_value = 0;
 	env->state++;
   }
   return value;
 }
 
-void envelope_init(envelope *env) {
-  env->state = ENV_OFF;
-  env->counter = 0;
-  env->attack_time = 0.005 * SAMPLE_RATE;
-  env->decay_time = 0.0010 * SAMPLE_RATE;
-  env->sustain_level = 0.7;
-  env->release_time = 1.000 * SAMPLE_RATE;
-
-  env->increases[0] = 1.0 / (float)env->attack_time;
-  env->increases[1] = (1.0 - env->sustain_level) / (float)env->decay_time;
-  env->increases[2] = env->sustain_level / (float)env->release_time;
-}
-
-void envelope_note_on(envelope *env) {
+void envelope_note_on(envelope_params params, envelope *env) {
   env->state = ENV_ATTACK;
   env->counter = 0;
+  env->params = params;
 }
 
 void envelope_note_off(envelope *env) {
@@ -124,11 +142,11 @@ oscilator_func osc_get(oscilator_type type) {
   }
 }
 
-void set_note_on(synth_voices *voices, size_t note_id) {
+void set_note_on(synth_params *params, synth_voices *voices, size_t note_id) {
   if (note_id >= voices->size) {
     return;
   }
-  envelope_note_on(&voices->buffer[note_id].envelope);
+  envelope_note_on(params->envelope_params, &voices->buffer[note_id].envelope);
   voices->buffer[note_id].active = true;
 }
 
@@ -156,6 +174,22 @@ void set_param(synth_params *params, param_type type, float value) {
   case PARAM_VOLUME: {
     params->master_volume = value;
     break;
+  }
+  case PARAM_ATTACK: {
+	params->envelope_params.attack_time = (int)value;
+	break;
+  }
+  case PARAM_DECAY: {
+	params->envelope_params.decay_time = (int)value;
+	break;
+  }
+  case PARAM_SUSTAIN: {
+	params->envelope_params.sustain_level = value;
+	break;
+  }
+  case PARAM_RELEASE: {
+	params->envelope_params.release_time = (int)value;
+	break;
   }
   }
 }
@@ -213,7 +247,7 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
       switch (msg.type) {
       case MSG_NOTE_ON: {
         size_t note_id = msg.note.note_id;
-        set_note_on(voices, note_id);
+        set_note_on(params, voices, note_id);
         break;
       }
       case MSG_NOTE_OFF: {
@@ -228,6 +262,7 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
       case MSG_PARAM_CHANGE: {
         param_type type = msg.param_change.param_type;
         float value = msg.param_change.value;
+		printf("%d %f\n", type, value);
         set_param(params, type, value);
         break;
       }
@@ -264,15 +299,13 @@ stop:
 }
 
 void fill_voices(synth_voice *voices, float *freqs, size_t freqs_amount) {
-  envelope env = {0};
-  envelope_init(&env);
   for (size_t i = 0; i < freqs_amount; i++) {
     voices[i] = (synth_voice){
         .active = false,
         .freq = freqs[i],
         .phase = 0,
         .phase_inc = 0,
-		.envelope = env,
+		.envelope = {0},
     };
   }
 }

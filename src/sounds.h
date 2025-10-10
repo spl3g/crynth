@@ -24,6 +24,11 @@
 typedef enum {
   PARAM_OSC,
   PARAM_VOLUME,
+
+  PARAM_ATTACK,
+  PARAM_DECAY,
+  PARAM_SUSTAIN,
+  PARAM_RELEASE,
 } param_type;
 
 typedef enum {
@@ -79,13 +84,17 @@ typedef enum {
 } envelope_state;
 
 typedef struct {
-  envelope_state state;
-  int counter;
   int attack_time;
   int decay_time;
   float sustain_level;
   int release_time;
-  float increases[3];
+} envelope_params;
+
+typedef struct {
+  envelope_state state;
+  int counter;
+  float current_value;
+  envelope_params params;
 } envelope;
 
 typedef struct {
@@ -104,12 +113,14 @@ typedef struct {
 typedef struct {
   oscilator_type oscilator_type;
   float master_volume;
+  envelope_params envelope_params;
 } synth_params;
 
 typedef float (*oscilator_func)(float phase);
 
 int mqueue_get(message_queue *q, synth_message *msg);
 int mqueue_push(message_queue *q, synth_message msg);
+int mqueue_push_many(message_queue *q, synth_message *msg, size_t count);
 
 #define mqueue_init(q)                                                         \
   do {                                                                         \

@@ -64,24 +64,57 @@ int init_sounds(app_state *state) {
 
   state->sound_thread = sound_thread;
 
-  synth_message param_message = {
+  synth_message param_messages[6] = {
+	{
       .type = MSG_PARAM_CHANGE,
       .param_change =
           {
               .param_type = PARAM_OSC,
               .value = OSC_SQUARE,
           },
-  };
-  mqueue_push(&state->msg_queue, param_message);
-  param_message = (synth_message){
+	},
+	{
       .type = MSG_PARAM_CHANGE,
       .param_change =
           {
               .param_type = PARAM_VOLUME,
               .value = 1,
           },
+	},
+	{
+	  .type = MSG_PARAM_CHANGE,
+	  .param_change =
+	  {
+		.param_type = PARAM_ATTACK,
+		.value = 0.005 * SAMPLE_RATE,
+	  },
+	},
+	{
+	  .type = MSG_PARAM_CHANGE,
+	  .param_change =
+	  {
+		.param_type = PARAM_DECAY,
+		.value = 0.0010 * SAMPLE_RATE,
+	  },
+	},
+	{
+	  .type = MSG_PARAM_CHANGE,
+	  .param_change =
+	  {
+		.param_type = PARAM_SUSTAIN,
+		.value = 0.7,
+	  },
+	},
+	{
+	  .type = MSG_PARAM_CHANGE,
+	  .param_change =
+	  {
+		.param_type = PARAM_RELEASE,
+		.value = 1.000 * SAMPLE_RATE,
+	  },
+	},
   };
-  mqueue_push(&state->msg_queue, param_message);
+  mqueue_push_many(&state->msg_queue, param_messages, 6);
   return 0;
 }
 
