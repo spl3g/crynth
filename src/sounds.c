@@ -61,22 +61,23 @@ float envelope_next(envelope *env) {
 	  next_state = true;
 	}
 
-	if (env->current_value == 0) {
-	  env->current_value = 1.0 / (float)env->params.attack_time;
+	if (env->current_inc == 0) {
+	  env->current_inc = (1.0 - env->release_value) / (float)env->params.attack_time;
 	}
 	
-	value = env->current_value * (float)env->counter;
+	value = env->release_value + env->current_inc * (float)env->counter;
 	break;
   }
   case ENV_DECAY: {
 	if (env->counter >= env->params.decay_time) {
 	  next_state = true;
 	}
-	if (env->current_value == 0) {
-	  env->current_value = (1.0 - env->params.sustain_level) / (float)env->params.decay_time;
+
+	if (env->current_inc == 0) {
+	  env->current_inc = (1.0 - env->params.sustain_level) / (float)env->params.decay_time;
 	}
 	
-	value = 1.0 - env->current_value * (float)env->counter;
+	value = 1.0 - env->current_inc * (float)env->counter;
 	break;
   }
   case ENV_SUSTAIN: {
@@ -86,21 +87,22 @@ float envelope_next(envelope *env) {
   case ENV_RELEASE: {
 	if (env->counter >= env->params.release_time) {
 	  env->state = ENV_OFF;
-	  env->counter = env->current_value = 0;
+	  env->counter = env->current_inc = 0;
 	  return 0;
 	}
 
-	if (env->current_value == 0) {
-	  env->current_value = env->params.sustain_level / (float)env->params.release_time;
+	if (env->current_inc == 0) {
+	  env->current_inc = env->params.sustain_level / (float)env->params.release_time;
 	}
 	
-	value = env->params.sustain_level - env->current_value * (float)env->counter;
+	value = env->params.sustain_level - env->current_inc * (float)env->counter;
+	env->release_value = value;
 	break;
   }
   }
 
   if (next_state) {
-	env->counter = env->current_value = 0;
+	env->counter = env->current_inc = 0;
 	env->state++;
   }
   return value;
@@ -277,7 +279,7 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
 
     generate_voices(voices, params, scratch_buffer, PERIOD_SIZE);
 
-    /* post_process(params, scratch_buffer, PERIOD_SIZE); */
+    post_process(params, scratch_buffer, PERIOD_SIZE);
     prepare_output(scratch_buffer, output_buffer, PERIOD_SIZE);
 
 	int period_size = PERIOD_SIZE;

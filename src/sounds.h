@@ -93,7 +93,8 @@ typedef struct {
 typedef struct {
   envelope_state state;
   int counter;
-  float current_value;
+  float current_inc;
+  float release_value;
   envelope_params params;
 } envelope;
 
