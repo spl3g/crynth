@@ -9,12 +9,14 @@
 #include <SDL3/SDL_keycode.h>
 
 #include "ui.h"
+#include "sounds.h"
 
 #define CLAY_IMPLEMENTATION
 #include "clay/clay.h"
 #include "clay/renderers/clay_renderer_SDL3.c"
 
-#include "sounds.h"
+#define ARENA_IMPLEMENTATION
+#include "arena.h"
 
 static const int SCREEN_FPS = 60;
 static const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
@@ -22,15 +24,12 @@ static const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
 static const int FONT_ID = 0;
 
 typedef struct {
-  char key;
-  float freq;
-} freq_map;
-
-typedef struct {
   SDL_Window *window;
   Clay_SDL3RendererData renderer_data;
+  Arena frame_arena;
   
-  bool last_keys[12];
+  KeyState *keys;
+  size_t keys_amount;
   
   snd_pcm_t *sound_device;
   message_queue msg_queue;
@@ -78,7 +77,7 @@ int init_sounds(app_state *state) {
       .param_change =
           {
               .param_type = PARAM_VOLUME,
-              .value = 1,
+              .value = 0.2,
           },
 	},
 	{
@@ -168,7 +167,6 @@ int init_ui(app_state *state) {
 
   state->renderer_data.fonts[FONT_ID] = font;
 
-
   size_t totalMemorySize = Clay_MinMemorySize();
   Clay_Arena clayMemory = (Clay_Arena) {
     .memory = SDL_malloc(totalMemorySize),
@@ -177,18 +175,31 @@ int init_ui(app_state *state) {
 
   int width, height;
   SDL_GetWindowSize(state->window, &width, &height);
-  Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) width, (float) height }, (Clay_ErrorHandler) { HandleClayErrors });
+  Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) width, (float) height }, (Clay_ErrorHandler) { HandleClayErrors, 0});
   Clay_SetMeasureTextFunction(SDL_MeasureText, state->renderer_data.fonts);
   
   return 0;
 }
 
+KeyState keys[12] = {
+  {'Z', SDL_SCANCODE_Z, 0, 0}, {'S', SDL_SCANCODE_S, 0, 0},
+  {'X', SDL_SCANCODE_X, 0, 0}, {'D', SDL_SCANCODE_D, 0, 0},
+  {'C', SDL_SCANCODE_C, 0, 0},
+  {'V', SDL_SCANCODE_V, 0, 0}, {'G', SDL_SCANCODE_G, 0, 0},
+  {'B', SDL_SCANCODE_B, 0, 0}, {'H', SDL_SCANCODE_H, 0, 0},
+  {'N', SDL_SCANCODE_N, 0, 0}, {'J', SDL_SCANCODE_J, 0, 0},
+  {'M', SDL_SCANCODE_M, 0, 0},
+};
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
   (void) argc;
   (void) argv;
-  
+
   app_state *state = malloc(sizeof(app_state));
+  memset(state, 0, sizeof(app_state));
   *appstate = state;
+  state->keys = keys;
+  state->keys_amount = 12;
 
   if (init_ui(state) != 0) {
 	printf("Couldn't initialize UI: %s", SDL_GetError());
@@ -204,12 +215,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
   app_state *state = appstate;
+  Arena *arena = &state->frame_arena;
+  arena_reset(arena);
 
   int start_tick = SDL_GetTicks();
 
+  UIData *ui_data = arena_alloc(arena, sizeof(UIData));
+  ui_data->msg_queue = &state->msg_queue;
+  ui_data->keys = state->keys;
+  ui_data->keys_amount = 12;
+
   Clay_BeginLayout();
 
-  draw_ui(state->last_keys, 12);
+  draw_ui(ui_data);
 
   Clay_RenderCommandArray render_commands = Clay_EndLayout();
 
@@ -230,16 +248,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   return SDL_APP_CONTINUE;
 }
 
-SDL_Keycode keys[12] = {
-  SDL_SCANCODE_Z, SDL_SCANCODE_S,
-  SDL_SCANCODE_X, SDL_SCANCODE_D,
-  SDL_SCANCODE_C,
-  SDL_SCANCODE_V, SDL_SCANCODE_G,
-  SDL_SCANCODE_B, SDL_SCANCODE_H,
-  SDL_SCANCODE_N, SDL_SCANCODE_J,
-  SDL_SCANCODE_M,
-};
-
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
   app_state *state = appstate;
 
@@ -249,11 +257,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
   }
   case SDL_EVENT_KEY_DOWN: {
 	for (int i = 0; i < 12; i++) {
-	  if (event->key.scancode == keys[i]) {
-		if (state->last_keys[i]) {
+	  if (event->key.scancode == state->keys[i].keycode) {
+		if (state->keys[i].keyboard_pressed) {
 		  break;
 		}
-		state->last_keys[i] = true;
+		state->keys[i].keyboard_pressed = true;
 		
 		mqueue_push(&state->msg_queue, (synth_message){
 		  .type = MSG_NOTE_ON,
@@ -266,11 +274,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
   case SDL_EVENT_KEY_UP: {
 	for (int i = 0; i < 12; i++) {
-	  if (event->key.scancode == keys[i]) {
-		if (!state->last_keys[i]) {
+	  if (event->key.scancode == state->keys[i].keycode) {
+		if (!state->keys[i].keyboard_pressed) {
 		  break;
 		}
-		state->last_keys[i] = false;
+		state->keys[i].keyboard_pressed = false;
 		mqueue_push(&state->msg_queue, (synth_message){
 		  .type = MSG_NOTE_OFF,
 		  .note = { .note_id = i },
@@ -293,6 +301,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     Clay_SetPointerState((Clay_Vector2) { event->button.x, event->button.y },
                          event->button.button == SDL_BUTTON_LEFT);
     break;
+  case SDL_EVENT_MOUSE_BUTTON_UP:
+	if (event->button.button == SDL_BUTTON_LEFT) {
+	  Clay_SetPointerState((Clay_Vector2) { event->button.x, event->button.y }, false);
+	}
+	break;
 
   case SDL_EVENT_MOUSE_WHEEL:
     Clay_UpdateScrollContainers(true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);

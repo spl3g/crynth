@@ -188,7 +188,7 @@ void post_process(synth_params *params, float *scratch_buffer,
 void prepare_output(float *scratch_buffer, short *output_buffer,
                     size_t buffer_size) {
   for (size_t i = 0; i < buffer_size; i++) {
-    output_buffer[i] = scratch_buffer[i] * 0.2f * 32767;
+    output_buffer[i] = scratch_buffer[i] * 32767;
   }
 }
 
@@ -218,7 +218,6 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
       case MSG_PARAM_CHANGE: {
         param_type type = msg.param_change.param_type;
         float value = msg.param_change.value;
-		printf("%d %f\n", type, value);
         set_param(params, type, value);
         break;
       }
