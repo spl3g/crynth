@@ -9,7 +9,7 @@
 
 #define nob_cc_include_path(cmd, path) cmd_append(cmd, temp_sprintf("-I%s", path))
 #define nob_cc_no_link(cmd) cmd_append(cmd, "-c")
-#define nob_cc_my_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra")
+#define nob_cc_my_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-ggdb")
 
 typedef struct {
   Nob_String_View *items;

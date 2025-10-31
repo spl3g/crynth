@@ -837,6 +837,9 @@ CLAY_DLL_EXPORT Clay_Arena Clay_CreateArenaWithCapacityAndMemory(size_t capacity
 // Sets the state of the "pointer" (i.e. the mouse or touch) in Clay's internal data. Used for detecting and responding to mouse events in the debug view,
 // as well as for Clay_Hovered() and scroll element handling.
 CLAY_DLL_EXPORT void Clay_SetPointerState(Clay_Vector2 position, bool pointerDown);
+// Gets the state of the "pointer". This will return the position provided by `Clay_SetPointerState` 
+// and the frame pressed state.
+CLAY_DLL_EXPORT Clay_PointerData Clay_GetPointerState();
 // Initialize Clay's internal arena and setup required data before layout can begin. Only needs to be called once.
 // - arena can be created using Clay_CreateArenaWithCapacityAndMemory()
 // - layoutDimensions are the initial bounding dimensions of the layout (i.e. the screen width and height for a full screen layout)
@@ -869,6 +872,8 @@ CLAY_DLL_EXPORT Clay_ElementId Clay_GetElementId(Clay_String idString);
 // - index is used to avoid constructing dynamic ID strings in loops.
 // Generally only used for dynamic strings when CLAY_IDI("stringLiteral", index) can't be used.
 CLAY_DLL_EXPORT Clay_ElementId Clay_GetElementIdWithIndex(Clay_String idString, uint32_t index);
+// Returns the ID of the currently open layout element.
+CLAY_DLL_EXPORT Clay_ElementId Clay_GetCurrentElementId(void);
 // Returns layout data such as the final calculated bounding box for an element with a given ID.
 // The returned Clay_ElementData contains a `found` bool that will be true if an element with the provided ID was found.
 // This ID can be calculated either with CLAY_ID() for string literal IDs, or Clay_GetElementId for dynamic strings.
@@ -4031,6 +4036,12 @@ void Clay_SetPointerState(Clay_Vector2 position, bool isPointerDown) {
     }
 }
 
+CLAY_WASM_EXPORT("Clay_GetPointerState")
+Clay_PointerData Clay_GetPointerState() {
+    Clay_Context* context = Clay_GetCurrentContext();
+    return context->pointerInfo;
+}
+
 CLAY_WASM_EXPORT("Clay_Initialize")
 Clay_Context* Clay_Initialize(Clay_Arena arena, Clay_Dimensions layoutDimensions, Clay_ErrorHandler errorHandler) {
     // Cacheline align memory passed in
@@ -4267,6 +4278,17 @@ Clay_ElementId Clay_GetElementId(Clay_String idString) {
 CLAY_WASM_EXPORT("Clay_GetElementIdWithIndex")
 Clay_ElementId Clay_GetElementIdWithIndex(Clay_String idString, uint32_t index) {
     return Clay__HashStringWithOffset(idString, index, 0);
+}
+
+CLAY_WASM_EXPORT("Clay_GetCurrentElementId")
+Clay_ElementId Clay_GetCurrentElementId(void) {
+    Clay_Context* context = Clay_GetCurrentContext();
+    if (context->openLayoutElementStack.length == 0) {
+        // Return a default or invalid ElementId if no element is open
+        return CLAY__INIT(Clay_ElementId) CLAY__DEFAULT_STRUCT;
+    }
+    Clay_LayoutElement* currentElement = Clay_LayoutElementArray_Get(&context->layoutElements, Clay__int32_tArray_GetValue(&context->openLayoutElementStack, context->openLayoutElementStack.length - 1));
+    return CLAY__INIT(Clay_ElementId) { .id = currentElement->id };
 }
 
 bool Clay_Hovered(void) {

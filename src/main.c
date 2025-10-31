@@ -12,8 +12,8 @@
 #include "sounds.h"
 
 #define CLAY_IMPLEMENTATION
-#include "clay/clay.h"
-#include "clay/renderers/clay_renderer_SDL3.c"
+#include "clay.h"
+#include "clay_renderer_SDL3.h"
 
 #define ARENA_IMPLEMENTATION
 #include "arena.h"
@@ -24,12 +24,25 @@ static const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
 static const int FONT_ID = 0;
 
 typedef struct {
+  bool pressed;
+
+  float position_x;
+  float position_y;
+  float pending_scroll_delta_x;
+  float pending_scroll_delta_y;
+} PointerState;
+
+
+typedef struct {
   SDL_Window *window;
   Clay_SDL3RendererData renderer_data;
   Arena frame_arena;
+  PointerState pointer;
   
   KeyState *keys;
   size_t keys_amount;
+
+  KnobSettings knob_settings;
   
   snd_pcm_t *sound_device;
   message_queue msg_queue;
@@ -40,7 +53,7 @@ int init_sounds(app_state *state) {
   int err;
 
   err =
-      snd_pcm_open(&state->sound_device, "default", SND_PCM_STREAM_PLAYBACK, 0);
+    snd_pcm_open(&state->sound_device, "default", SND_PCM_STREAM_PLAYBACK, 0);
   if (err < 0) {
     printf("error: failed to open device: %s", snd_strerror(err));
     return err;
@@ -62,30 +75,62 @@ int init_sounds(app_state *state) {
   pthread_create(&sound_thread, NULL, sound_thread_start, sound_thread_params);
 
   state->sound_thread = sound_thread;
+  state->knob_settings = (KnobSettings){
+	.volume = {
+	  .param_type = PARAM_VOLUME,
+	  .value = 0.2,
+	  .range_start = 0,
+	  .range_end = 1,
+	},
+	.attack = {
+	  .param_type = PARAM_ATTACK,
+	  .value = 5,
+	  .range_start = 0,
+	  .range_end = 1000,
+	},
+	.decay = {
+	  .param_type = PARAM_DECAY,
+	  .value = 10,
+	  .range_start = 0,
+	  .range_end = 1000,
+	},
+	.sustain = {
+	  .param_type = PARAM_SUSTAIN,
+	  .value = 0.7,
+	  .range_start = 0,
+	  .range_end = 1,
+	},
+	.release = {
+	  .param_type = PARAM_RELEASE,
+	  .value = 100,
+	  .range_start = 0,
+	  .range_end = 5000,
+	},
+  };
 
   synth_message param_messages[6] = {
 	{
       .type = MSG_PARAM_CHANGE,
       .param_change =
-          {
-              .param_type = PARAM_OSC,
-              .value = OSC_SQUARE,
-          },
+	  {
+		.param_type = PARAM_OSC,
+		.value = OSC_SAW,
+	  },
 	},
 	{
       .type = MSG_PARAM_CHANGE,
       .param_change =
-          {
-              .param_type = PARAM_VOLUME,
-              .value = 0.2,
-          },
+	  {
+		.param_type = PARAM_VOLUME,
+		.value = state->knob_settings.volume.value,
+	  },
 	},
 	{
 	  .type = MSG_PARAM_CHANGE,
 	  .param_change =
 	  {
 		.param_type = PARAM_ATTACK,
-		.value = 0.005 * SAMPLE_RATE,
+		.value = state->knob_settings.attack.value,
 	  },
 	},
 	{
@@ -93,7 +138,7 @@ int init_sounds(app_state *state) {
 	  .param_change =
 	  {
 		.param_type = PARAM_DECAY,
-		.value = 0.0010 * SAMPLE_RATE,
+		.value = state->knob_settings.decay.value,
 	  },
 	},
 	{
@@ -101,7 +146,7 @@ int init_sounds(app_state *state) {
 	  .param_change =
 	  {
 		.param_type = PARAM_SUSTAIN,
-		.value = 0.7,
+		.value = state->knob_settings.sustain.value,
 	  },
 	},
 	{
@@ -109,7 +154,7 @@ int init_sounds(app_state *state) {
 	  .param_change =
 	  {
 		.param_type = PARAM_RELEASE,
-		.value = 1.000 * SAMPLE_RATE,
+		.value = state->knob_settings.release.value,
 	  },
 	},
   };
@@ -119,20 +164,20 @@ int init_sounds(app_state *state) {
 
 static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
 {
-    TTF_Font **fonts = userData;
-    TTF_Font *font = fonts[config->fontId];
-    int width, height;
+  TTF_Font **fonts = userData;
+  TTF_Font *font = fonts[config->fontId];
+  int width, height;
 
-    TTF_SetFontSize(font, config->fontSize);
-    if (!TTF_GetStringSize(font, text.chars, text.length, &width, &height)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError());
-    }
+  TTF_SetFontSize(font, config->fontSize);
+  if (!TTF_GetStringSize(font, text.chars, text.length, &width, &height)) {
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to measure text: %s", SDL_GetError());
+  }
 
-    return (Clay_Dimensions) { (float) width, (float) height };
+  return (Clay_Dimensions) { (float) width, (float) height };
 }
 
 void HandleClayErrors(Clay_ErrorData errorData) {
-    printf("%s", errorData.errorText.chars);
+  printf("%s", errorData.errorText.chars);
 }
 
 int init_ui(app_state *state) {
@@ -224,7 +269,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   ui_data->msg_queue = &state->msg_queue;
   ui_data->keys = state->keys;
   ui_data->keys_amount = 12;
+  ui_data->arena = arena;
+  ui_data->knob_settings = &state->knob_settings;
 
+  Clay_SetPointerState((Clay_Vector2){ state->pointer.position_x, state->pointer.position_y }, state->pointer.pressed);
+  Clay_UpdateScrollContainers(true, (Clay_Vector2){ state->pointer.pending_scroll_delta_x, state->pointer.pending_scroll_delta_y }, 0.016f);
+  state->pointer.pending_scroll_delta_x = 0;
+  state->pointer.pending_scroll_delta_y = 0;
+  
   Clay_BeginLayout();
 
   draw_ui(ui_data);
@@ -293,24 +345,28 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     break;
 
   case SDL_EVENT_MOUSE_MOTION:
-    Clay_SetPointerState((Clay_Vector2) { event->motion.x, event->motion.y },
-                         event->motion.state & SDL_BUTTON_LMASK);
+	state->pointer.pressed = event->motion.state & SDL_BUTTON_LMASK;
+	state->pointer.position_x = event->motion.x;
+	state->pointer.position_y = event->motion.y;
     break;
 
   case SDL_EVENT_MOUSE_BUTTON_DOWN:
-    Clay_SetPointerState((Clay_Vector2) { event->button.x, event->button.y },
-                         event->button.button == SDL_BUTTON_LEFT);
+	state->pointer.pressed = event->button.button == SDL_BUTTON_LEFT;
+	state->pointer.position_x = event->button.x;
+	state->pointer.position_y = event->button.y;
     break;
   case SDL_EVENT_MOUSE_BUTTON_UP:
 	if (event->button.button == SDL_BUTTON_LEFT) {
-	  Clay_SetPointerState((Clay_Vector2) { event->button.x, event->button.y }, false);
+	  state->pointer.pressed = false;
+	  state->pointer.position_x = event->button.x;
+	  state->pointer.position_y = event->button.y;
 	}
 	break;
 
   case SDL_EVENT_MOUSE_WHEEL:
-    Clay_UpdateScrollContainers(true, (Clay_Vector2) { event->wheel.x, event->wheel.y }, 0.01f);
+	state->pointer.pending_scroll_delta_x += event->wheel.x;
+	state->pointer.pending_scroll_delta_y += event->wheel.y;
     break;
-
 
   default:
 	break;

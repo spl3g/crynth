@@ -1,3 +1,4 @@
+#define MIDI_FREQS_LIST
 #include "sounds.h"
 
 float envelope_next(envelope *env) {
@@ -132,11 +133,11 @@ void set_param(synth_params *params, param_type type, float value) {
     break;
   }
   case PARAM_ATTACK: {
-	params->envelope_params.attack_time = (int)value;
+	params->envelope_params.attack_time = (int)(value / 1000 * SAMPLE_RATE);
 	break;
   }
   case PARAM_DECAY: {
-	params->envelope_params.decay_time = (int)value;
+	params->envelope_params.decay_time = (int)(value / 1000 * SAMPLE_RATE);
 	break;
   }
   case PARAM_SUSTAIN: {
@@ -144,7 +145,7 @@ void set_param(synth_params *params, param_type type, float value) {
 	break;
   }
   case PARAM_RELEASE: {
-	params->envelope_params.release_time = (int)value;
+	params->envelope_params.release_time = (int)(value / 1000 * SAMPLE_RATE);
 	break;
   }
   }
@@ -192,8 +193,8 @@ void prepare_output(float *scratch_buffer, short *output_buffer,
   }
 }
 
-void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
-                      synth_voices *voices, synth_params *params) {
+void sound_loop_start(snd_pcm_t *pcm, message_queue *queue, synth_voices *voices) {
+  synth_params params;
   short output_buffer[PERIOD_SIZE];
   float scratch_buffer[PERIOD_SIZE];
 
@@ -203,7 +204,7 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
       switch (msg.type) {
       case MSG_NOTE_ON: {
         size_t note_id = msg.note.note_id;
-        set_note_on(params, voices, note_id);
+        set_note_on(&params, voices, note_id);
         break;
       }
       case MSG_NOTE_OFF: {
@@ -218,7 +219,7 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
       case MSG_PARAM_CHANGE: {
         param_type type = msg.param_change.param_type;
         float value = msg.param_change.value;
-        set_param(params, type, value);
+        set_param(&params, type, value);
         break;
       }
       case MSG_STOP: {
@@ -230,9 +231,9 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue,
     memset(&output_buffer, 0, PERIOD_SIZE * sizeof(short));
     memset(&scratch_buffer, 0, PERIOD_SIZE * sizeof(float));
 
-    generate_voices(voices, params, scratch_buffer, PERIOD_SIZE);
+    generate_voices(voices, &params, scratch_buffer, PERIOD_SIZE);
 
-    post_process(params, scratch_buffer, PERIOD_SIZE);
+    post_process(&params, scratch_buffer, PERIOD_SIZE);
     prepare_output(scratch_buffer, output_buffer, PERIOD_SIZE);
 
 	int period_size = PERIOD_SIZE;
@@ -253,11 +254,11 @@ stop:
   return;
 }
 
-void fill_voices(synth_voice *voices, float *freqs, size_t freqs_amount) {
+void fill_voices(synth_voice *voices, MidiNote *freqs, size_t freqs_amount) {
   for (size_t i = 0; i < freqs_amount; i++) {
     voices[i] = (synth_voice){
         .active = false,
-        .freq = freqs[i],
+        .freq = freqs[i].freq,
         .phase = 0,
         .phase_inc = 0,
 		.envelope = {0},
@@ -268,33 +269,15 @@ void fill_voices(synth_voice *voices, float *freqs, size_t freqs_amount) {
 void *sound_thread_start(void *ptr) {
   sound_thread_meta *meta = ptr;
 
-  float freqs[12] = {
-      261.63f, // c
-      277.18f, // c#
-      293.66f, // e
-      311.13f, // e#
-      329.63f, // d
-      349.23f, // f
-      369.99f, // f#
-      392,     // g
-      415.3f,  // g#
-      440,     // a
-      466.16,  // a#
-      493.88,  // b
-  };
-
   synth_voice buffer[12];
-  fill_voices(buffer, freqs, 12);
+  fill_voices(buffer, &midi_freqs[49], 12);
 
   synth_voices voices = {
       .buffer = buffer,
       .size = 12,
   };
-  synth_params params = {
-      .oscilator_type = OSC_SINE,
-  };
 
-  sound_loop_start(meta->pcm, meta->queue, &voices, &params);
+  sound_loop_start(meta->pcm, meta->queue, &voices);
 
   check(snd_pcm_drop(meta->pcm));
   return NULL;

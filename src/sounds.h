@@ -8,6 +8,7 @@
 #include <stdbool.h>
 
 #include "messages.h"
+#include "midi_freqs.h"
 
 #define check(ret)                                                             \
   do {                                                                         \

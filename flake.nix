@@ -19,22 +19,34 @@
   in {
     devShells = forEachSupportedSystem (
       {pkgs}: {
-        default = pkgs.mkShell {
-          packages = with pkgs; [
-            clang
-            stdenv.cc
-            lldb
-
-            man-pages
-            man-pages-posix
-
+        default = let
+          libs = with pkgs; [
             alsa-lib
 
-            sdl3
+            sdl3.dev
             sdl3-ttf
             sdl3-image
           ];
-        };
+        in
+          pkgs.mkShell {
+            packages = with pkgs;
+              [
+                clang
+                stdenv.cc
+                lldb
+                gdb
+
+                man-pages
+                man-pages-posix
+              ]
+              ++ libs;
+            shellHook = ''
+              rm -r .lib-links
+              mkdir .lib-links
+
+              ${builtins.concatStringsSep "\n " (map (lib: "ln -s ${lib} .lib-links/") libs)}
+            '';
+          };
       }
     );
 
