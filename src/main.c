@@ -22,6 +22,10 @@ static const int SCREEN_FPS = 60;
 static const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
 
 static const int FONT_ID = 0;
+static const Clay_Dimensions DEFAULT_DIMENSIONS = {
+  .width = 1280,
+  .height = 720,
+};
 
 typedef struct {
   bool pressed;
@@ -189,7 +193,7 @@ int init_ui(app_state *state) {
 	return 1;
   }
 
-  if (!SDL_CreateWindowAndRenderer("crynth", 640, 480, SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS, &state->window, &state->renderer_data.renderer)) {
+  if (!SDL_CreateWindowAndRenderer("crynth", DEFAULT_DIMENSIONS.width, DEFAULT_DIMENSIONS.height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS, &state->window, &state->renderer_data.renderer)) {
 	return 1;
   }
 
@@ -265,12 +269,15 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
   int start_tick = SDL_GetTicks();
 
+  Clay_Dimensions dimensions = Clay_GetCurrentContext()->layoutDimensions;
+
   UIData *ui_data = arena_alloc(arena, sizeof(UIData));
   ui_data->msg_queue = &state->msg_queue;
   ui_data->keys = state->keys;
   ui_data->keys_amount = 12;
   ui_data->arena = arena;
   ui_data->knob_settings = &state->knob_settings;
+  ui_data->scale = dimensions.width / DEFAULT_DIMENSIONS.width;
 
   Clay_SetPointerState((Clay_Vector2){ state->pointer.position_x, state->pointer.position_y }, state->pointer.pressed);
   Clay_UpdateScrollContainers(true, (Clay_Vector2){ state->pointer.pending_scroll_delta_x, state->pointer.pending_scroll_delta_y }, 0.016f);

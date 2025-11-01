@@ -153,7 +153,7 @@ void draw_white_key(size_t idx, UIData *ui_data) {
 	}
 	CLAY(CLAY_IDI("white_key", idx), {
 	  .layout = {
-	    .sizing = {CLAY_SIZING_FIXED(40), CLAY_SIZING_FIXED(100)},
+	    .sizing = {CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
 	  },
 	  .backgroundColor = fill_color,
 	  .border = { .width = {1, 1, 1, 1, 0}, .color = border_color},
@@ -209,7 +209,7 @@ void draw_black_key(size_t idx, UIData *ui_data) {
 	
 	CLAY(CLAY_IDI("black_key", idx), {
       .layout = {
-	    .sizing = {CLAY_SIZING_FIXED(25), CLAY_SIZING_FIXED(65)},
+	    .sizing = {CLAY_SIZING_FIXED(25 * ui_data->scale), CLAY_SIZING_FIXED(65 * ui_data->scale)},
 	  },
 	  .backgroundColor = fill_color,
       .border = { .width = {1, 1, 0, 1, 0}, .color = border_color},
@@ -220,7 +220,7 @@ void draw_black_key(size_t idx, UIData *ui_data) {
 void draw_keyboard(UIData *ui_data) {
   CLAY(CLAY_ID("keyboard_container"), {
 	  .layout = {
-		.sizing = {CLAY_SIZING_FIXED(280), CLAY_SIZING_FIXED(100)},
+		.sizing = {CLAY_SIZING_FIXED(280 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
 		.layoutDirection = CLAY_LEFT_TO_RIGHT,
 		.childAlignment = {CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER},
 	  },
@@ -294,18 +294,18 @@ void draw_knob(Clay_ElementId id, UIData *ui_data, KnobInfo* knob_info, Clay_Siz
 void draw_panel(UIData *ui_data) {
   CLAY(CLAY_ID("panel_container"), {
 	  .layout = {
-		.sizing = {CLAY_SIZING_FIXED(450), CLAY_SIZING_FIXED(100)},
+		.sizing = {CLAY_SIZING_FIXED(450 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
 		.childGap = 30,
 		.childAlignment = {CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER},
 	  },
   }) {
 	CLAY(CLAY_ID("volume_knob_container")) {
-	  draw_knob(CLAY_ID("volume_knob"), ui_data, &ui_data->knob_settings->volume, CLAY_SIZING_FIXED(85), CLAY_SIZING_FIXED(45));
+	  draw_knob(CLAY_ID("volume_knob"), ui_data, &ui_data->knob_settings->volume, CLAY_SIZING_FIXED(85 * ui_data->scale), CLAY_SIZING_FIXED(45 * ui_data->scale));
 	}
 
 	CLAY(CLAY_ID("wave_screen"), {
 		.layout = {
-		  .sizing = {CLAY_SIZING_FIXED(200), CLAY_SIZING_FIXED(100)},
+		  .sizing = {CLAY_SIZING_FIXED(200 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
 		},
 		.border = { .width = {1, 1, 1, 1, 0}, .color = COLOR_FG },
 	  });
@@ -321,16 +321,16 @@ void draw_panel(UIData *ui_data) {
 			.childGap = 5,
 		  },
 	  }) {
-		draw_knob(CLAY_ID("attack_knob"), ui_data, &ui_data->knob_settings->attack, CLAY_SIZING_FIXED(40), CLAY_SIZING_FIXED(21));
-		draw_knob(CLAY_ID("decay_knob"), ui_data, &ui_data->knob_settings->decay, CLAY_SIZING_FIXED(40), CLAY_SIZING_FIXED(21));
+		draw_knob(CLAY_ID("attack_knob"), ui_data, &ui_data->knob_settings->attack, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
+		draw_knob(CLAY_ID("decay_knob"), ui_data, &ui_data->knob_settings->decay, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
 	  }
 	  CLAY(CLAY_ID("envelope_knobs_lower"), {
 		  .layout = {
 			.childGap = 5,
 		  },
 	  }) {
-		draw_knob(CLAY_ID("sustain_knob"), ui_data, &ui_data->knob_settings->sustain, CLAY_SIZING_FIXED(40), CLAY_SIZING_FIXED(21));
-		draw_knob(CLAY_ID("release_knob"), ui_data, &ui_data->knob_settings->release, CLAY_SIZING_FIXED(40), CLAY_SIZING_FIXED(21));
+		draw_knob(CLAY_ID("sustain_knob"), ui_data, &ui_data->knob_settings->sustain, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
+		draw_knob(CLAY_ID("release_knob"), ui_data, &ui_data->knob_settings->release, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
 	  }
 	}
   };

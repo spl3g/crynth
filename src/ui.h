@@ -48,6 +48,7 @@ typedef struct {
   size_t keys_amount;
   KnobSettings *knob_settings;
   Arena *arena;
+  float scale;
 } UIData;
 
 typedef struct {
