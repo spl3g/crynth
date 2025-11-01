@@ -9,6 +9,7 @@
 
 #include "messages.h"
 #include "midi_freqs.h"
+#include "defines.h"
 
 #define check(ret)                                                             \
   do {                                                                         \
@@ -20,12 +21,10 @@
     }                                                                          \
   } while (0)
 
-#define SAMPLE_RATE 48000
-#define PERIOD_SIZE 480
-
 typedef struct {
   snd_pcm_t *pcm;
   message_queue *queue;
+  WaveData *wave_data;
 } sound_thread_meta;
 
 typedef enum {
@@ -68,6 +67,7 @@ typedef struct {
   oscilator_type oscilator_type;
   float master_volume;
   envelope_params envelope_params;
+  float last_freq;
 } synth_params;
 
 typedef float (*oscilator_func)(float phase);

@@ -1,4 +1,5 @@
 #include "clay_renderer_SDL3.h"
+#include <stdio.h>
 
 /* Global for convenience. Even in 4K this is enough for smooth curves (low radius or rect size coupled with
  * no AA or low resolution might make it appear as jagged curves) */
@@ -131,7 +132,7 @@ static void SDL_Clay_RenderArc(Clay_SDL3RendererData *rendererData, const SDL_FP
   }
 }
 
-int SDL_Clay_RenderCircle(SDL_Renderer *renderer, float x, float y, float width, float height, float start_angle, float end_angle, const Clay_Color _color) {
+void SDL_Clay_RenderCircle(SDL_Renderer *renderer, float x, float y, float width, float height, float start_angle, float end_angle, const Clay_Color _color) {
   const SDL_FColor color = { _color.r/255, _color.g/255, _color.b/255, _color.a/255 };
   float center_x = x + width / 2;
   float center_y = y + width / 2;
@@ -172,7 +173,28 @@ int SDL_Clay_RenderCircle(SDL_Renderer *renderer, float x, float y, float width,
   }
 
   SDL_RenderGeometry(renderer, NULL, vertices, vertexCount, indices, indexCount);
-  return 0;
+}
+
+void SDL_Clay_RenderWaveScreen(SDL_Renderer *renderer, float x, float y, float width, float height, const Clay_Color color, float *point_buffer, size_t buffer_len) {
+  SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+  float samples_per_px = (float)buffer_len / width;
+
+  for (int px = 0; px < (int)width; px++) {
+	size_t start = (size_t)(px * samples_per_px);
+	size_t end   = (size_t)((px + 1) * samples_per_px);
+	if (end >= buffer_len) end = buffer_len - 1;
+
+	float minv = 1.0f, maxv = -1.0f;
+	for (size_t i = start; i <= end; i++) {
+	  if (point_buffer[i] < minv) minv = point_buffer[i];
+	  if (point_buffer[i] > maxv) maxv = point_buffer[i];
+	}
+
+	float y_min = y + height * (0.5f - 0.5f * maxv);
+	float y_max = y + height * (0.5f - 0.5f * minv);
+
+	SDL_RenderLine(renderer, x + px, y_min, x + px, y_max);
+  }
 }
 
 SDL_Rect currentClippingRectangle;
@@ -308,6 +330,12 @@ void SDL_Clay_RenderClayCommands(Clay_SDL3RendererData *rendererData, Clay_Rende
 		
 		SDL_Clay_RenderCircle(rendererData->renderer, bounding_box.x, bounding_box.y, bounding_box.width, bounding_box.height, start_angle, end_angle, config.color);
 		break;
+	  }
+	  case CUSTOM_ELEMENT_TYPE_WAVE_SCREEN: {
+		WaveScreenData config = custom_element->wave_screen;
+		SDL_Clay_RenderWaveScreen(rendererData->renderer, bounding_box.x, bounding_box.y,
+								  bounding_box.width, bounding_box.height, config.color,
+								  config.point_buffer, config.buffer_len);
 	  }
 	  }
 	  break; 

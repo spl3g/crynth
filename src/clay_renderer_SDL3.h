@@ -14,6 +14,7 @@ typedef struct {
 
 typedef enum {
   CUSTOM_ELEMENT_TYPE_CIRCLE,
+  CUSTOM_ELEMENT_TYPE_WAVE_SCREEN,
 } CustomElementType;
 
 typedef struct {
@@ -23,10 +24,17 @@ typedef struct {
 } CircleData;
 
 typedef struct {
+  float *point_buffer;
+  size_t buffer_len;
+  Clay_Color color;
+} WaveScreenData;
+
+typedef struct {
   CustomElementType type;
 
   union {
 	CircleData circle;
+	WaveScreenData wave_screen;
   };
 } CustomElementData;
 

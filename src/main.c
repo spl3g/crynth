@@ -18,15 +18,6 @@
 #define ARENA_IMPLEMENTATION
 #include "arena.h"
 
-static const int SCREEN_FPS = 60;
-static const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
-
-static const int FONT_ID = 0;
-static const Clay_Dimensions DEFAULT_DIMENSIONS = {
-  .width = 1280,
-  .height = 720,
-};
-
 typedef struct {
   bool pressed;
 
@@ -50,6 +41,7 @@ typedef struct {
   
   snd_pcm_t *sound_device;
   message_queue msg_queue;
+  WaveData wave_data;
   pthread_t sound_thread;
 } app_state;
 
@@ -74,6 +66,7 @@ int init_sounds(app_state *state) {
   sound_thread_meta *sound_thread_params = malloc(sizeof(sound_thread_meta));
   sound_thread_params->pcm = state->sound_device;
   sound_thread_params->queue = &state->msg_queue;
+  sound_thread_params->wave_data = &state->wave_data;
 
   pthread_t sound_thread;
   pthread_create(&sound_thread, NULL, sound_thread_start, sound_thread_params);
@@ -193,7 +186,7 @@ int init_ui(app_state *state) {
 	return 1;
   }
 
-  if (!SDL_CreateWindowAndRenderer("crynth", DEFAULT_DIMENSIONS.width, DEFAULT_DIMENSIONS.height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS, &state->window, &state->renderer_data.renderer)) {
+  if (!SDL_CreateWindowAndRenderer("crynth", DEFAULT_DIMENSIONS_WIDTH, DEFAULT_DIMENSIONS_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_BORDERLESS, &state->window, &state->renderer_data.renderer)) {
 	return 1;
   }
 
@@ -272,12 +265,36 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   Clay_Dimensions dimensions = Clay_GetCurrentContext()->layoutDimensions;
 
   UIData *ui_data = arena_alloc(arena, sizeof(UIData));
+  ui_data->arena = arena;
   ui_data->msg_queue = &state->msg_queue;
+
+  int read_index = 1 - atomic_load(&state->wave_data.write_index);
+  float *wave_buffer = state->wave_data.buffers[read_index];
+
+  size_t buffer_start = 0;
+  for (size_t i = 1; i < DISPLAY_SAMPLES; i++) {
+    if (wave_buffer[i-1] < 0 && wave_buffer[i] >= 0) {
+	  buffer_start = i;
+	  break;
+	}
+  }
+
+  // clamp cycle length if it goes past the end
+  size_t cycle_len = SAMPLE_RATE / state->wave_data.freq;
+  size_t display_len = cycle_len;
+  if (buffer_start + cycle_len > DISPLAY_SAMPLES) {
+    display_len = DISPLAY_SAMPLES - buffer_start;
+  }
+  
+  ui_data->wave_buffer = &wave_buffer[buffer_start];
+  ui_data->wave_buffer_size = display_len;
+
   ui_data->keys = state->keys;
   ui_data->keys_amount = 12;
-  ui_data->arena = arena;
+
   ui_data->knob_settings = &state->knob_settings;
-  ui_data->scale = dimensions.width / DEFAULT_DIMENSIONS.width;
+  ui_data->scale = dimensions.width / DEFAULT_DIMENSIONS_WIDTH;  
+
 
   Clay_SetPointerState((Clay_Vector2){ state->pointer.position_x, state->pointer.position_y }, state->pointer.pressed);
   Clay_UpdateScrollContainers(true, (Clay_Vector2){ state->pointer.pending_scroll_delta_x, state->pointer.pending_scroll_delta_y }, 0.016f);

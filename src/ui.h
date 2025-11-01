@@ -14,6 +14,8 @@
 #include "clay.h"
 #include "messages.h"
 
+#include "defines.h"
+
 static const Clay_Color COLOR_BG = (Clay_Color){45, 53, 59, 255};
 static const Clay_Color COLOR_BG_INTER = (Clay_Color){52, 63, 68, 255};
 static const Clay_Color COLOR_FG = (Clay_Color){211, 198, 170, 255};
@@ -43,11 +45,14 @@ typedef struct {
 } KnobSettings;
 
 typedef struct {
+  Arena *arena;
   message_queue *msg_queue;
+  float *wave_buffer;
+  size_t wave_buffer_size;
+
   KeyState *keys;
   size_t keys_amount;
   KnobSettings *knob_settings;
-  Arena *arena;
   float scale;
 } UIData;
 

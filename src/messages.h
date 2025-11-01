@@ -3,8 +3,8 @@
 
 #include <stddef.h>
 #include <pthread.h>
-
-#define MESSAGE_QUEUE_SIZE 128
+#include <stdatomic.h>
+#include "defines.h"
 
 typedef enum {
   PARAM_OSC,
@@ -54,6 +54,12 @@ typedef struct {
   size_t tail;
   pthread_mutex_t lock;
 } message_queue;
+
+typedef struct {
+  float freq;
+  float buffers[2][DISPLAY_SAMPLES];
+  atomic_int write_index;
+} WaveData;
 
 int mqueue_get(message_queue *q, synth_message *msg);
 int mqueue_push(message_queue *q, synth_message msg);

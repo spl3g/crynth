@@ -105,6 +105,7 @@ void set_note_on(synth_params *params, synth_voices *voices, size_t note_id) {
   }
   envelope_note_on(params->envelope_params, &voices->buffer[note_id].envelope);
   voices->buffer[note_id].active = true;
+  params->last_freq = voices->buffer[note_id].freq;
 }
 
 void set_note_off(synth_voices *voices, size_t note_id) {
@@ -179,6 +180,22 @@ void generate_voices(synth_voices *voices, synth_params *params, float *buffer, 
   }
 }
 
+void print_wave(oscilator_func osc, float freq, size_t size) {
+  float phase = 0;
+  float phase_inc = 2 * M_PI * freq / SAMPLE_RATE;
+  
+  printf("float wave_buffer[%d] = {\n", size);
+  for (size_t j = 0; j < size; j++) {
+	printf("  %f,\n", osc(phase));
+
+	phase += phase_inc;
+	if (phase >= 2 * M_PI)
+	  phase -= 2 * M_PI;
+	
+  }
+  printf("}\n");
+}
+
 void post_process(synth_params *params, float *scratch_buffer,
                   size_t buffer_size) {
   for (size_t i = 0; i < buffer_size; i++) {
@@ -193,10 +210,12 @@ void prepare_output(float *scratch_buffer, short *output_buffer,
   }
 }
 
-void sound_loop_start(snd_pcm_t *pcm, message_queue *queue, synth_voices *voices) {
+void sound_loop_start(snd_pcm_t *pcm, message_queue *queue, WaveData *wave_data, synth_voices *voices) {
   synth_params params;
   short output_buffer[PERIOD_SIZE];
   float scratch_buffer[PERIOD_SIZE];
+  float display_buffer[DISPLAY_SAMPLES];
+  size_t display_write_pos = 0;
 
   while (true) {
     synth_message msg;
@@ -235,6 +254,20 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue, synth_voices *voices
 
     post_process(&params, scratch_buffer, PERIOD_SIZE);
     prepare_output(scratch_buffer, output_buffer, PERIOD_SIZE);
+
+	if (display_write_pos + PERIOD_SIZE > DISPLAY_SAMPLES) {
+	  size_t diff = DISPLAY_SAMPLES - display_write_pos;
+	  memcpy(&display_buffer[display_write_pos], scratch_buffer, diff * sizeof(float));
+	  memcpy(display_buffer, &scratch_buffer[diff], (PERIOD_SIZE - diff) * sizeof(float));
+	} else {
+	  memcpy(&display_buffer[display_write_pos], scratch_buffer, PERIOD_SIZE * sizeof(float));
+	}
+	
+	display_write_pos = (display_write_pos + PERIOD_SIZE) % DISPLAY_SAMPLES;
+
+	memcpy(wave_data->buffers[wave_data->write_index], display_buffer, DISPLAY_SAMPLES * sizeof(float));
+	atomic_store(&wave_data->write_index, 1 - atomic_load(&wave_data->write_index));
+	wave_data->freq = params.last_freq;
 
 	int period_size = PERIOD_SIZE;
 	short *ptr = output_buffer;
@@ -277,7 +310,7 @@ void *sound_thread_start(void *ptr) {
       .size = 12,
   };
 
-  sound_loop_start(meta->pcm, meta->queue, &voices);
+  sound_loop_start(meta->pcm, meta->queue, meta->wave_data, &voices);
 
   check(snd_pcm_drop(meta->pcm));
   return NULL;

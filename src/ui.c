@@ -291,6 +291,29 @@ void draw_knob(Clay_ElementId id, UIData *ui_data, KnobInfo* knob_info, Clay_Siz
   }
 }
 
+void draw_screen(UIData *ui_data) {
+  
+  CustomElementData *wave = arena_alloc(ui_data->arena, sizeof(CustomElementData));
+  wave->type = CUSTOM_ELEMENT_TYPE_WAVE_SCREEN;
+  wave->wave_screen = (WaveScreenData){
+	.point_buffer = ui_data->wave_buffer,
+	.buffer_len = ui_data->wave_buffer_size,
+	.color = COLOR_FG,
+  };
+
+  CLAY(CLAY_ID("wave_screen"), {
+	  .layout = {
+		.sizing = {CLAY_SIZING_FIXED(200 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
+	  },
+	  .border = { .width = {1, 1, 1, 1, 0}, .color = COLOR_FG },
+	  .custom = {
+		.customData = wave,
+	  },
+  }) {
+	
+  };
+}
+
 void draw_panel(UIData *ui_data) {
   CLAY(CLAY_ID("panel_container"), {
 	  .layout = {
@@ -303,12 +326,7 @@ void draw_panel(UIData *ui_data) {
 	  draw_knob(CLAY_ID("volume_knob"), ui_data, &ui_data->knob_settings->volume, CLAY_SIZING_FIXED(85 * ui_data->scale), CLAY_SIZING_FIXED(45 * ui_data->scale));
 	}
 
-	CLAY(CLAY_ID("wave_screen"), {
-		.layout = {
-		  .sizing = {CLAY_SIZING_FIXED(200 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
-		},
-		.border = { .width = {1, 1, 1, 1, 0}, .color = COLOR_FG },
-	  });
+	draw_screen(ui_data);
 	
 	CLAY(CLAY_ID("envelope_knobs_container"), {
 		.layout = {
