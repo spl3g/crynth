@@ -1,0 +1,17 @@
+#ifndef DEFINES_H_
+#define DEFINES_H_
+
+#define MESSAGE_QUEUE_SIZE 128
+#define SAMPLE_RATE 48000
+#define PERIOD_SIZE 480
+#define DISPLAY_SAMPLES 960
+
+static const int SCREEN_FPS = 60;
+static const int SCREEN_TICKS_PER_FRAME = 1000 / SCREEN_FPS;
+
+static const int FONT_ID = 0;
+
+#define DEFAULT_DIMENSIONS_HEIGHT 720
+#define DEFAULT_DIMENSIONS_WIDTH 1280
+
+#endif // DEFINES_H_
