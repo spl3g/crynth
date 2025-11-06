@@ -1,7 +1,7 @@
 #define MIDI_FREQS_LIST
 #include "sounds.h"
 
-float envelope_next(envelope *env) {
+float envelope_next(Envelope *env) {
   float value;
   bool next_state = false;
 
@@ -63,13 +63,13 @@ float envelope_next(envelope *env) {
   return value;
 }
 
-void envelope_note_on(envelope_params params, envelope *env) {
+void envelope_note_on(EnvelopeParams params, Envelope *env) {
   env->state = ENV_ATTACK;
   env->counter = 0;
   env->params = params;
 }
 
-void envelope_note_off(envelope *env) {
+void envelope_note_off(Envelope *env) {
   env->state = ENV_RELEASE;
   env->counter = 0;
 }
@@ -86,7 +86,7 @@ float osc_saw_get(float phase) {
   return (phase / M_PI) - 1;
 }
 
-oscilator_func osc_get(oscilator_type type) {
+OscilatorFunc osc_get(OscilatorType type) {
   switch (type) {
   case OSC_SINE:
     return osc_sine_get;
@@ -99,7 +99,7 @@ oscilator_func osc_get(oscilator_type type) {
   }
 }
 
-void set_note_on(synth_params *params, synth_voices *voices, size_t note_id) {
+void set_note_on(SynthParams *params, SynthVoices *voices, size_t note_id) {
   if (note_id >= voices->size) {
     return;
   }
@@ -108,14 +108,14 @@ void set_note_on(synth_params *params, synth_voices *voices, size_t note_id) {
   params->last_freq = voices->buffer[note_id].freq;
 }
 
-void set_note_off(synth_voices *voices, size_t note_id) {
+void set_note_off(SynthVoices *voices, size_t note_id) {
   if (note_id >= voices->size) {
     return;
   }
   envelope_note_off(&voices->buffer[note_id].envelope);
 }
 
-void set_all_notes_off(synth_voices *voices) {
+void set_all_notes_off(SynthVoices *voices) {
   for (size_t i = 0; i < voices->size; i++) {
     if (voices->buffer[i].active) {
       voices->buffer[i].active = false;
@@ -123,7 +123,7 @@ void set_all_notes_off(synth_voices *voices) {
   }
 }
 
-void set_param(synth_params *params, param_type type, float value) {
+void set_param(SynthParams *params, ParamType type, float value) {
   switch (type) {
   case PARAM_OSC: {
     params->oscilator_type = (int)value;
@@ -152,10 +152,10 @@ void set_param(synth_params *params, param_type type, float value) {
   }
 }
 
-void generate_voices(synth_voices *voices, synth_params *params, float *buffer, size_t buffer_size) {
-  oscilator_func oscilator = osc_get(params->oscilator_type);
+void generate_voices(SynthVoices *voices, SynthParams *params, float *buffer, size_t buffer_size) {
+  OscilatorFunc oscilator = osc_get(params->oscilator_type);
   for (size_t i = 0; i < voices->size; i++) {
-    synth_voice *voice = &voices->buffer[i];
+    SynthVoice *voice = &voices->buffer[i];
     if (!voice->active) {
       continue;
     }
@@ -180,7 +180,7 @@ void generate_voices(synth_voices *voices, synth_params *params, float *buffer, 
   }
 }
 
-void print_wave(oscilator_func osc, float freq, size_t size) {
+void print_wave(OscilatorFunc osc, float freq, size_t size) {
   float phase = 0;
   float phase_inc = 2 * M_PI * freq / SAMPLE_RATE;
   
@@ -196,7 +196,7 @@ void print_wave(oscilator_func osc, float freq, size_t size) {
   printf("}\n");
 }
 
-void post_process(synth_params *params, float *scratch_buffer,
+void post_process(SynthParams *params, float *scratch_buffer,
                   size_t buffer_size) {
   for (size_t i = 0; i < buffer_size; i++) {
     scratch_buffer[i] *= params->master_volume;
@@ -210,15 +210,15 @@ void prepare_output(float *scratch_buffer, short *output_buffer,
   }
 }
 
-void sound_loop_start(snd_pcm_t *pcm, message_queue *queue, WaveData *wave_data, synth_voices *voices) {
-  synth_params params;
+void sound_loop_start(snd_pcm_t *pcm, MessageQueue *queue, WaveData *wave_data, SynthVoices *voices) {
+  SynthParams params;
   short output_buffer[PERIOD_SIZE];
   float scratch_buffer[PERIOD_SIZE];
   float display_buffer[DISPLAY_SAMPLES];
   size_t display_write_pos = 0;
 
   while (true) {
-    synth_message msg;
+    SynthMessage msg;
     while (mqueue_get(queue, &msg) == 0) {
       switch (msg.type) {
       case MSG_NOTE_ON: {
@@ -236,7 +236,7 @@ void sound_loop_start(snd_pcm_t *pcm, message_queue *queue, WaveData *wave_data,
         break;
       }
       case MSG_PARAM_CHANGE: {
-        param_type type = msg.param_change.param_type;
+        ParamType type = msg.param_change.param_type;
         float value = msg.param_change.value;
         set_param(&params, type, value);
         break;
@@ -287,9 +287,9 @@ stop:
   return;
 }
 
-void fill_voices(synth_voice *voices, MidiNote *freqs, size_t freqs_amount) {
+void fill_voices(SynthVoice *voices, MidiNote *freqs, size_t freqs_amount) {
   for (size_t i = 0; i < freqs_amount; i++) {
-    voices[i] = (synth_voice){
+    voices[i] = (SynthVoice){
         .active = false,
         .freq = freqs[i].freq,
         .phase = 0,
@@ -300,12 +300,12 @@ void fill_voices(synth_voice *voices, MidiNote *freqs, size_t freqs_amount) {
 }
 
 void *sound_thread_start(void *ptr) {
-  sound_thread_meta *meta = ptr;
+  SoundThreadMeta *meta = ptr;
 
-  synth_voice buffer[12];
+  SynthVoice buffer[12];
   fill_voices(buffer, &midi_freqs[49], 12);
 
-  synth_voices voices = {
+  SynthVoices voices = {
       .buffer = buffer,
       .size = 12,
   };

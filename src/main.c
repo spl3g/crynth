@@ -40,7 +40,7 @@ typedef struct {
   KnobSettings knob_settings;
   
   snd_pcm_t *sound_device;
-  message_queue msg_queue;
+  MessageQueue msg_queue;
   WaveData wave_data;
   pthread_t sound_thread;
 } app_state;
@@ -63,7 +63,7 @@ int init_sounds(app_state *state) {
 
   mqueue_init(&state->msg_queue);
 
-  sound_thread_meta *sound_thread_params = malloc(sizeof(sound_thread_meta));
+  SoundThreadMeta *sound_thread_params = malloc(sizeof(SoundThreadMeta));
   sound_thread_params->pcm = state->sound_device;
   sound_thread_params->queue = &state->msg_queue;
   sound_thread_params->wave_data = &state->wave_data;
@@ -105,7 +105,7 @@ int init_sounds(app_state *state) {
 	},
   };
 
-  synth_message param_messages[6] = {
+  SynthMessage param_messages[6] = {
 	{
       .type = MSG_PARAM_CHANGE,
       .param_change =
@@ -339,7 +339,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 		}
 		state->keys[i].keyboard_pressed = true;
 		
-		mqueue_push(&state->msg_queue, (synth_message){
+		mqueue_push(&state->msg_queue, (SynthMessage){
 		  .type = MSG_NOTE_ON,
 		  .note = { .note_id = i },
 		});
@@ -355,7 +355,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 		  break;
 		}
 		state->keys[i].keyboard_pressed = false;
-		mqueue_push(&state->msg_queue, (synth_message){
+		mqueue_push(&state->msg_queue, (SynthMessage){
 		  .type = MSG_NOTE_OFF,
 		  .note = { .note_id = i },
 		});
@@ -403,9 +403,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
   
   app_state *state = appstate;
 
-  message_queue *queue = &state->msg_queue;
+  MessageQueue *queue = &state->msg_queue;
 
-  synth_message stop_msg = {.type = MSG_STOP};
+  SynthMessage stop_msg = {.type = MSG_STOP};
   mqueue_push(queue, stop_msg);
 
   pthread_join(state->sound_thread, NULL);

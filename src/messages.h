@@ -14,14 +14,14 @@ typedef enum {
   PARAM_DECAY,
   PARAM_SUSTAIN,
   PARAM_RELEASE,
-} param_type;
+} ParamType;
 
 typedef enum {
   OSC_SINE,
   OSC_SAW,
   OSC_SQUARE,
   OSC_TRIANGLE,
-} oscilator_type;
+} OscilatorType;
 
 typedef enum {
   MSG_NOTE_ON,
@@ -29,10 +29,10 @@ typedef enum {
   MSG_ALL_NOTES_OFF,
   MSG_PARAM_CHANGE,
   MSG_STOP,
-} synth_message_type;
+} SynthMessageType;
 
 typedef struct {
-  synth_message_type type;
+  SynthMessageType type;
 
   union {
 	// NOTE_ON / NOTE_OFF
@@ -42,18 +42,18 @@ typedef struct {
 
 	// SET_PARAM;
 	struct {
-	  param_type param_type;
+	  ParamType param_type;
 	  float value;
 	} param_change;
   };
-} synth_message;
+} SynthMessage;
 
 typedef struct {
-  synth_message buffer[MESSAGE_QUEUE_SIZE];
+  SynthMessage buffer[MESSAGE_QUEUE_SIZE];
   size_t head;
   size_t tail;
   pthread_mutex_t lock;
-} message_queue;
+} MessageQueue;
 
 typedef struct {
   float freq;
@@ -61,9 +61,9 @@ typedef struct {
   atomic_int write_index;
 } WaveData;
 
-int mqueue_get(message_queue *q, synth_message *msg);
-int mqueue_push(message_queue *q, synth_message msg);
-int mqueue_push_many(message_queue *q, synth_message *msg, size_t count);
+int mqueue_get(MessageQueue *q, SynthMessage *msg);
+int mqueue_push(MessageQueue *q, SynthMessage msg);
+int mqueue_push_many(MessageQueue *q, SynthMessage *msg, size_t count);
 
 #define mqueue_init(q)                                                         \
   do {                                                                         \

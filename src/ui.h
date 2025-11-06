@@ -31,7 +31,7 @@ typedef struct {
 
 typedef struct {
   float value;
-  param_type param_type;
+  ParamType param_type;
   float range_start;
   float range_end;
 } KnobInfo;
@@ -46,7 +46,7 @@ typedef struct {
 
 typedef struct {
   Arena *arena;
-  message_queue *msg_queue;
+  MessageQueue *msg_queue;
   float *wave_buffer;
   size_t wave_buffer_size;
 

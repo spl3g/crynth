@@ -76,7 +76,7 @@ void handle_knob_press(Clay_ElementId element_id, Clay_PointerData pointer_info,
 	float value = denormalize_value(normalized_value, start, end);
 
 	knob->info->value = value;
-	mqueue_push(ui_data->msg_queue, (synth_message){
+	mqueue_push(ui_data->msg_queue, (SynthMessage){
 	  .type = MSG_PARAM_CHANGE,
 	  .param_change = {
 		.param_type = knob->info->param_type,
@@ -94,7 +94,7 @@ void handle_key_press(Clay_ElementId element_id, Clay_PointerData pointer_info, 
 
   if (!pressed && (pointer_info.state == CLAY_POINTER_DATA_PRESSED_THIS_FRAME
 									  || pointer_info.state == CLAY_POINTER_DATA_PRESSED)) {
-	mqueue_push(ui_data->msg_queue, (synth_message){
+	mqueue_push(ui_data->msg_queue, (SynthMessage){
 		.type = MSG_NOTE_ON,
 		.note = {
 		  .note_id = idx,
@@ -106,7 +106,7 @@ void handle_key_press(Clay_ElementId element_id, Clay_PointerData pointer_info, 
   if (pressed && (pointer_info.state == CLAY_POINTER_DATA_RELEASED_THIS_FRAME
 								 || pointer_info.state == CLAY_POINTER_DATA_RELEASED)) {
 	if (!ui_data->keys[idx].keyboard_pressed) {
-	  mqueue_push(ui_data->msg_queue, (synth_message){
+	  mqueue_push(ui_data->msg_queue, (SynthMessage){
 		  .type = MSG_NOTE_OFF,
 		  .note = {
 			.note_id = idx,
@@ -124,7 +124,7 @@ void draw_white_key(size_t idx, UIData *ui_data) {
 	bool hovered = Clay_Hovered();
 
 	if (!hovered && mouse_pressed && !keyboard_pressed) {
-	  mqueue_push(ui_data->msg_queue, (synth_message){
+	  mqueue_push(ui_data->msg_queue, (SynthMessage){
 	    .type = MSG_NOTE_OFF,
 	    .note = {
 		  .note_id = idx,
@@ -180,7 +180,7 @@ void draw_black_key(size_t idx, UIData *ui_data) {
 	bool hovered = Clay_Hovered();
 
 	if (!hovered && mouse_pressed && !keyboard_pressed) {
-	  mqueue_push(ui_data->msg_queue, (synth_message){
+	  mqueue_push(ui_data->msg_queue, (SynthMessage){
 		  .type = MSG_NOTE_OFF,
 		  .note = {
 			.note_id = idx,
