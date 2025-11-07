@@ -1,8 +1,60 @@
 #define MIDI_FREQS_LIST
 #include "sounds.h"
 
+typedef enum {
+  ENV_OFF,
+  ENV_ATTACK,
+  ENV_DECAY,
+  ENV_SUSTAIN,
+  ENV_RELEASE,
+} EnvelopeState;
+
+typedef struct {
+  int attack_time;
+  int decay_time;
+  float sustain_level;
+  int release_time;
+} EnvelopeParams;
+
+typedef struct {
+  EnvelopeState state;
+  int counter;
+  float current_inc;
+  float current_value;
+  EnvelopeParams params;
+} Envelope;
+
+typedef struct {
+  bool active;
+  float freq;
+  float phase;
+  float phase_inc;
+  Envelope envelope;
+} SynthVoice;
+
+typedef struct {
+  SynthVoice *buffer;
+  size_t size;
+} SynthVoices;
+
+typedef struct {
+  OscilatorType oscilator_type;
+  float master_volume;
+  EnvelopeParams envelope_params;
+} SynthParams;
+
+typedef struct {
+  SynthParams params;
+  SynthVoice *last_voice;
+
+  MessageQueue *queue;
+  WaveData *wave_data;
+  SynthVoices *voices;
+} SynthState;
+
+typedef float (*OscilatorFunc)(float phase);
+
 float envelope_next(Envelope *env) {
-  float value;
   bool next_state = false;
 
   env->counter++;
@@ -17,10 +69,10 @@ float envelope_next(Envelope *env) {
 	}
 
 	if (env->current_inc == 0) {
-	  env->current_inc = (1.0 - env->release_value) / (float)env->params.attack_time;
+	  env->current_inc = (1.0 - env->current_value) / (float)env->params.attack_time;
 	}
 	
-	value = env->release_value + env->current_inc * (float)env->counter;
+	env->current_value += env->current_inc;
 	break;
   }
   case ENV_DECAY: {
@@ -32,26 +84,31 @@ float envelope_next(Envelope *env) {
 	  env->current_inc = (1.0 - env->params.sustain_level) / (float)env->params.decay_time;
 	}
 	
-	value = 1.0 - env->current_inc * (float)env->counter;
+	env->current_value -= env->current_inc;
 	break;
   }
   case ENV_SUSTAIN: {
-	value = env->params.sustain_level;
+	env->current_value = env->params.sustain_level;
 	break;
   }
   case ENV_RELEASE: {
 	if (env->counter >= env->params.release_time) {
 	  env->state = ENV_OFF;
-	  env->counter = env->current_inc = 0;
+	  env->counter = env->current_inc = env->current_value = 0;
 	  return 0;
 	}
 
 	if (env->current_inc == 0) {
-	  env->current_inc = env->params.sustain_level / (float)env->params.release_time;
+	  float from_level;
+	  if (env->params.sustain_level > env->current_value) {
+		from_level = (env->params.sustain_level - env->current_value);
+	  }else {
+		from_level = env->current_value;
+	  }
+	  env->current_inc = from_level / (float)env->params.release_time;
 	}
 	
-	value = env->params.sustain_level - env->current_inc * (float)env->counter;
-	env->release_value = value;
+	env->current_value -= env->current_inc;
 	break;
   }
   }
@@ -60,18 +117,20 @@ float envelope_next(Envelope *env) {
 	env->counter = env->current_inc = 0;
 	env->state++;
   }
-  return value;
+  return env->current_value;
 }
 
 void envelope_note_on(EnvelopeParams params, Envelope *env) {
   env->state = ENV_ATTACK;
   env->counter = 0;
+  env->current_inc = 0;
   env->params = params;
 }
 
 void envelope_note_off(Envelope *env) {
   env->state = ENV_RELEASE;
   env->counter = 0;
+  env->current_inc = 0;
 }
 
 float osc_sine_get(float phase) {
@@ -105,7 +164,6 @@ void set_note_on(SynthParams *params, SynthVoices *voices, size_t note_id) {
   }
   envelope_note_on(params->envelope_params, &voices->buffer[note_id].envelope);
   voices->buffer[note_id].active = true;
-  params->last_freq = voices->buffer[note_id].freq;
 }
 
 void set_note_off(SynthVoices *voices, size_t note_id) {
@@ -210,8 +268,28 @@ void prepare_output(float *scratch_buffer, short *output_buffer,
   }
 }
 
-void sound_loop_start(snd_pcm_t *pcm, MessageQueue *queue, WaveData *wave_data, SynthVoices *voices) {
-  SynthParams params;
+void play_output_buffer(snd_pcm_t *pcm, short *output_buffer) {
+  int period_size = PERIOD_SIZE;
+  short *ptr = output_buffer;
+
+  while (period_size > 0) {
+	snd_pcm_sframes_t written = snd_pcm_writei(pcm, ptr, period_size);
+	if (written < 0) {
+	  printf("xrun\n");
+	  snd_pcm_prepare(pcm); // recover from xrun
+	  break;
+	}
+	ptr += written;
+	period_size -= written;
+  }
+}
+
+void sound_loop(snd_pcm_t *pcm, SynthState *state) {
+  MessageQueue *queue = state->queue;
+  WaveData *wave_data = state->wave_data;
+  SynthVoices *voices = state->voices;
+  SynthParams params = state->params;
+  
   short output_buffer[PERIOD_SIZE];
   float scratch_buffer[PERIOD_SIZE];
   float display_buffer[DISPLAY_SAMPLES];
@@ -224,6 +302,7 @@ void sound_loop_start(snd_pcm_t *pcm, MessageQueue *queue, WaveData *wave_data, 
       case MSG_NOTE_ON: {
         size_t note_id = msg.note.note_id;
         set_note_on(&params, voices, note_id);
+		state->last_voice = &voices->buffer[note_id];
         break;
       }
       case MSG_NOTE_OFF: {
@@ -255,33 +334,15 @@ void sound_loop_start(snd_pcm_t *pcm, MessageQueue *queue, WaveData *wave_data, 
     post_process(&params, scratch_buffer, PERIOD_SIZE);
     prepare_output(scratch_buffer, output_buffer, PERIOD_SIZE);
 
-	if (display_write_pos + PERIOD_SIZE > DISPLAY_SAMPLES) {
-	  size_t diff = DISPLAY_SAMPLES - display_write_pos;
-	  memcpy(&display_buffer[display_write_pos], scratch_buffer, diff * sizeof(float));
-	  memcpy(display_buffer, &scratch_buffer[diff], (PERIOD_SIZE - diff) * sizeof(float));
-	} else {
-	  memcpy(&display_buffer[display_write_pos], scratch_buffer, PERIOD_SIZE * sizeof(float));
-	}
-	
+	memcpy(&display_buffer[display_write_pos], scratch_buffer, PERIOD_SIZE * sizeof(float));
 	display_write_pos = (display_write_pos + PERIOD_SIZE) % DISPLAY_SAMPLES;
 
-	memcpy(wave_data->buffers[wave_data->write_index], display_buffer, DISPLAY_SAMPLES * sizeof(float));
-	atomic_store(&wave_data->write_index, 1 - atomic_load(&wave_data->write_index));
-	wave_data->freq = params.last_freq;
-
-	int period_size = PERIOD_SIZE;
-	short *ptr = output_buffer;
-	
-	while (period_size > 0) {
-      snd_pcm_sframes_t written = snd_pcm_writei(pcm, ptr, period_size);
-      if (written < 0) {
-		printf("xrun\n");
-		snd_pcm_prepare(pcm); // recover from xrun
-		break;
-      }
-	  ptr += written;
-	  period_size -= written;
+	if (display_write_pos == 0) {
+	  memcpy(wave_data->buffers[atomic_load(&wave_data->write_index)], display_buffer, DISPLAY_SAMPLES * sizeof(float));
+	  atomic_store(&wave_data->write_index, 1 - atomic_load(&wave_data->write_index));
 	}
+
+	play_output_buffer(pcm, output_buffer);
   }
 stop:
   return;
@@ -302,15 +363,22 @@ void fill_voices(SynthVoice *voices, MidiNote *freqs, size_t freqs_amount) {
 void *sound_thread_start(void *ptr) {
   SoundThreadMeta *meta = ptr;
 
-  SynthVoice buffer[12];
-  fill_voices(buffer, &midi_freqs[49], 12);
+  SynthVoice buffer[24];
+  fill_voices(buffer, &midi_freqs[48], 24);
 
   SynthVoices voices = {
       .buffer = buffer,
-      .size = 12,
+      .size = 24,
   };
 
-  sound_loop_start(meta->pcm, meta->queue, meta->wave_data, &voices);
+  SynthState state = {
+	.params = {0},
+	.queue = meta->queue,
+	.wave_data = meta->wave_data,
+	.voices = &voices,
+  };
+
+  sound_loop(meta->pcm, &state);
 
   check(snd_pcm_drop(meta->pcm));
   return NULL;

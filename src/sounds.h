@@ -27,51 +27,6 @@ typedef struct {
   WaveData *wave_data;
 } SoundThreadMeta;
 
-typedef enum {
-  ENV_OFF,
-  ENV_ATTACK,
-  ENV_DECAY,
-  ENV_SUSTAIN,
-  ENV_RELEASE,
-} EnvelopeState;
-
-typedef struct {
-  int attack_time;
-  int decay_time;
-  float sustain_level;
-  int release_time;
-} EnvelopeParams;
-
-typedef struct {
-  EnvelopeState state;
-  int counter;
-  float current_inc;
-  float release_value;
-  EnvelopeParams params;
-} Envelope;
-
-typedef struct {
-  bool active;
-  float freq;
-  float phase;
-  float phase_inc;
-  Envelope envelope;
-} SynthVoice;
-
-typedef struct {
-  SynthVoice *buffer;
-  size_t size;
-} SynthVoices;
-
-typedef struct {
-  OscilatorType oscilator_type;
-  float master_volume;
-  EnvelopeParams envelope_params;
-  float last_freq;
-} SynthParams;
-
-typedef float (*OscilatorFunc)(float phase);
-
 void *sound_thread_start(void *ptr);
 int set_hw_params(snd_pcm_t *pcm);
 

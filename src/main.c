@@ -223,7 +223,7 @@ int init_ui(app_state *state) {
   return 0;
 }
 
-KeyState keys[12] = {
+static KeyState keys[] = {
   {'Z', SDL_SCANCODE_Z, 0, 0}, {'S', SDL_SCANCODE_S, 0, 0},
   {'X', SDL_SCANCODE_X, 0, 0}, {'D', SDL_SCANCODE_D, 0, 0},
   {'C', SDL_SCANCODE_C, 0, 0},
@@ -231,6 +231,14 @@ KeyState keys[12] = {
   {'B', SDL_SCANCODE_B, 0, 0}, {'H', SDL_SCANCODE_H, 0, 0},
   {'N', SDL_SCANCODE_N, 0, 0}, {'J', SDL_SCANCODE_J, 0, 0},
   {'M', SDL_SCANCODE_M, 0, 0},
+
+  {'Q', SDL_SCANCODE_Q, 0, 0}, {'2', SDL_SCANCODE_2, 0, 0},
+  {'W', SDL_SCANCODE_W, 0, 0}, {'3', SDL_SCANCODE_3, 0, 0},
+  {'E', SDL_SCANCODE_E, 0, 0},
+  {'R', SDL_SCANCODE_R, 0, 0}, {'6', SDL_SCANCODE_5, 0, 0},
+  {'T', SDL_SCANCODE_T, 0, 0}, {'7', SDL_SCANCODE_6, 0, 0},
+  {'Y', SDL_SCANCODE_Y, 0, 0}, {'8', SDL_SCANCODE_7, 0, 0},
+  {'U', SDL_SCANCODE_U, 0, 0},
 };
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
@@ -241,7 +249,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
   memset(state, 0, sizeof(app_state));
   *appstate = state;
   state->keys = keys;
-  state->keys_amount = 12;
+  state->keys_amount = sizeof(keys)/sizeof(keys[0]);
 
   if (init_ui(state) != 0) {
 	printf("Couldn't initialize UI: %s", SDL_GetError());
@@ -254,6 +262,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
 
   return SDL_APP_CONTINUE;
 }
+
+float old_wave_buffer[DISPLAY_SAMPLES];
 
 SDL_AppResult SDL_AppIterate(void *appstate) {
   app_state *state = appstate;
@@ -279,18 +289,17 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 	}
   }
 
-  // clamp cycle length if it goes past the end
-  size_t cycle_len = SAMPLE_RATE / state->wave_data.freq;
-  size_t display_len = cycle_len;
-  if (buffer_start + cycle_len > DISPLAY_SAMPLES) {
-    display_len = DISPLAY_SAMPLES - buffer_start;
+  if (buffer_start < 100) {
+	ui_data->wave_buffer = &wave_buffer[buffer_start];
+	ui_data->wave_buffer_size = DISPLAY_SAMPLES - 100;
+	memcpy(old_wave_buffer, &wave_buffer[buffer_start], (DISPLAY_SAMPLES - 100) * sizeof(float));
+  } else {
+	ui_data->wave_buffer = old_wave_buffer;
+	ui_data->wave_buffer_size = DISPLAY_SAMPLES - 100;
   }
-  
-  ui_data->wave_buffer = &wave_buffer[buffer_start];
-  ui_data->wave_buffer_size = display_len;
 
   ui_data->keys = state->keys;
-  ui_data->keys_amount = 12;
+  ui_data->keys_amount = state->keys_amount;
 
   ui_data->knob_settings = &state->knob_settings;
   ui_data->scale = dimensions.width / DEFAULT_DIMENSIONS_WIDTH;  
@@ -332,7 +341,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return SDL_APP_SUCCESS;
   }
   case SDL_EVENT_KEY_DOWN: {
-	for (int i = 0; i < 12; i++) {
+	for (size_t i = 0; i < state->keys_amount; i++) {
 	  if (event->key.scancode == state->keys[i].keycode) {
 		if (state->keys[i].keyboard_pressed) {
 		  break;
@@ -349,7 +358,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
   }
 
   case SDL_EVENT_KEY_UP: {
-	for (int i = 0; i < 12; i++) {
+	for (size_t i = 0; i < state->keys_amount; i++) {
 	  if (event->key.scancode == state->keys[i].keycode) {
 		if (!state->keys[i].keyboard_pressed) {
 		  break;
