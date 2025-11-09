@@ -4,13 +4,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
-
-#include <SDL3/SDL_scancode.h>
-#include <SDL3/SDL_keycode.h>
+#include <math.h>
 
 #include "arena.h"
+#include "sokol/sokol_app.h"
 
-#include "clay_renderer_SDL3.h"
+#include "custom_elements.h"
 #include "clay.h"
 #include "messages.h"
 
@@ -24,7 +23,7 @@ static const Clay_Color COLOR_ACCENT = (Clay_Color){133, 146, 137, 255};
 
 typedef struct {
   char letter;
-  SDL_Keycode keycode;
+  sapp_keycode keycode;
   bool mouse_pressed;
   bool keyboard_pressed;
 } KeyState;

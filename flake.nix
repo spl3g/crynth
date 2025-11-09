@@ -23,9 +23,7 @@
           libs = with pkgs; [
             alsa-lib
 
-            sdl3.dev
-            sdl3-ttf
-            sdl3-image
+            libGL.dev
           ];
         in
           pkgs.mkShell {
@@ -38,6 +36,10 @@
 
                 man-pages
                 man-pages-posix
+
+                xorg.libX11
+                xorg.libXi
+                xorg.libXcursor
               ]
               ++ libs;
             shellHook = ''

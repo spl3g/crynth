@@ -13,14 +13,14 @@ float point_angle_on_circle(Clay_Vector2 point, Clay_BoundingBox circle) {
   float center_x = circle.x + circle.width / 2;
   float center_y = circle.y + circle.width / 2;
 
-  float point_rad = SDL_atan2f(point.y - center_y, point.x - center_x);
+  float point_rad = atan2f(point.y - center_y, point.x - center_x);
 
-  return point_rad * 180.0f / SDL_PI_F;
+  return point_rad * 180.0f / M_PI;
 }
 
 float point_value_on_circle(Clay_Vector2 point, Clay_BoundingBox circle, float start_angle) {
   float point_on_circle = point_angle_on_circle(point, circle);
-  float value = SDL_fmodf((point_on_circle - start_angle + 360), 360) / 360;
+  float value = fmodf((point_on_circle - start_angle + 360), 360) / 360;
   return value;
 }
 
@@ -170,9 +170,9 @@ void draw_black_key(size_t idx, UIData *ui_data) {
 		  .element = CLAY_ATTACH_POINT_CENTER_TOP,
 		  .parent = CLAY_ATTACH_POINT_RIGHT_TOP,
 		},
-		.offset = {
-		  .y = -1,
-		},
+		/* .offset = { */
+		/*   .y = -1, */
+		/* }, */
 	  },
 	}) {
 	bool mouse_pressed = ui_data->keys[idx].mouse_pressed;
@@ -261,13 +261,13 @@ void draw_knob(Clay_ElementId id, UIData *ui_data, KnobInfo* knob_info, Clay_Siz
 	knob_element_data->circle = (CircleData){
 	  .start_angle = -90,
 	  .value = value,
-	  .color = hovered ? COLOR_FG_INTER : COLOR_FG,
 	};
 	CLAY_AUTO_ID({
 		.layout = {
 		  .sizing = {outer_size, outer_size},
 		  .childAlignment = {CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER},
 		},
+		.backgroundColor = hovered ? COLOR_FG_INTER : COLOR_FG,
 		.custom = {
 		  .customData = knob_element_data,
 		},
@@ -277,12 +277,12 @@ void draw_knob(Clay_ElementId id, UIData *ui_data, KnobInfo* knob_info, Clay_Siz
 	  inner_data->circle = (CircleData){
 		.start_angle = 0,
 		.value = 1.0f,
-		.color = COLOR_ACCENT,
 	  };
 	  CLAY_AUTO_ID({
 		  .layout = {
 			.sizing = {inner_size, inner_size},
 		  },
+		  .backgroundColor = COLOR_ACCENT,
 		  .custom = {
 			.customData = inner_data,
 		  },
@@ -298,13 +298,13 @@ void draw_screen(UIData *ui_data) {
   wave->wave_screen = (WaveScreenData){
 	.point_buffer = ui_data->wave_buffer,
 	.buffer_len = ui_data->wave_buffer_size,
-	.color = COLOR_FG,
   };
 
   CLAY(CLAY_ID("wave_screen"), {
 	  .layout = {
 		.sizing = {CLAY_SIZING_FIXED(200 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
 	  },
+	  .backgroundColor = COLOR_FG,
 	  .border = { .width = {1, 1, 1, 1, 0}, .color = COLOR_FG },
 	  .custom = {
 		.customData = wave,

@@ -9,7 +9,7 @@
 
 #define nob_cc_include_path(cmd, path) cmd_append(cmd, temp_sprintf("-I%s", path))
 #define nob_cc_no_link(cmd) cmd_append(cmd, "-c")
-#define nob_cc_my_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-ggdb")
+#define nob_cc_my_flags(cmd) cmd_append(cmd, "-Wall", "-Wextra", "-Wno-unused-function", "-ggdb")
 
 typedef struct {
   Nob_String_View *items;
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     nob_cmd_append(&cmd, input_sb.items);
   }
 
-  nob_cmd_append(&cmd, "-lm", "-lasound", "-lSDL3", "-lSDL3_ttf");
+  nob_cmd_append(&cmd, "-lm", "-lasound", "-lGL", "-lX11", "-lXcursor", "-lXi");
   nob_cc_output(&cmd, BUILD_FOLDER "crynth");
 
   if (!nob_cmd_run(&cmd))
