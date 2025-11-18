@@ -16,6 +16,7 @@ typedef struct {
 typedef struct {
   float *point_buffer;
   size_t buffer_len;
+  size_t thickness;
 } WaveScreenData;
 
 typedef struct {

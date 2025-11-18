@@ -298,20 +298,25 @@ void draw_screen(UIData *ui_data) {
   wave->wave_screen = (WaveScreenData){
 	.point_buffer = ui_data->wave_buffer,
 	.buffer_len = ui_data->wave_buffer_size,
+	.thickness = 2,
   };
 
-  CLAY(CLAY_ID("wave_screen"), {
-	  .layout = {
-		.sizing = {CLAY_SIZING_FIXED(200 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
-	  },
-	  .backgroundColor = COLOR_FG,
-	  .border = { .width = {1, 1, 1, 1, 0}, .color = COLOR_FG },
-	  .custom = {
-		.customData = wave,
-	  },
+  CLAY(CLAY_ID("wave_border"), {
+    .border = { .width = {1, 1, 1, 1, 0}, .color = COLOR_FG },
   }) {
-	
-  };
+	CLAY(CLAY_ID("wave_screen"), {
+		.layout = {
+		  .sizing = {CLAY_SIZING_FIXED(200 * ui_data->scale), CLAY_SIZING_FIXED(100 * ui_data->scale)},
+		},
+		.backgroundColor = COLOR_FG,
+		.custom = {
+		  .customData = wave,
+		},
+		.clip = {
+		  .horizontal = true,
+		},
+	  });
+  }
 }
 
 void draw_panel(UIData *ui_data) {

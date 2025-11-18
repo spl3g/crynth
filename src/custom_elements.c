@@ -131,10 +131,10 @@ static void draw_thick_line(float x1, float y1, float x2, float y2, float thickn
   sgl_v2f(x2bottom, y2bottom);
 }
 
-static void draw_wave_screen(float x, float y, float h, float w, float *points, size_t len) {
+static void draw_wave_screen(float x, float y, float h, float w, int thickness, float *points, size_t len) {
   float samples_per_px = (float)len / w;
 
-  float last_point = y + points[0] * h;
+  float last_point = y + h * (0.5f - 0.5f * points[0]);
   for (int px = 1; px < (int)w; px++) {
 	size_t start = (size_t)(px * samples_per_px);
 	size_t end   = (size_t)((px + 1) * samples_per_px);
@@ -148,12 +148,25 @@ static void draw_wave_screen(float x, float y, float h, float w, float *points, 
 
 	float y_min = y + h * (0.5f - 0.5f * maxv);
 	float y_max = y + h * (0.5f - 0.5f * minv);
-
-	if (y_min == y_max) {
-	  printf("%d %f %d %f\n", x + px - 1, last_point, x + px, y_max);
-	  draw_thick_line(x + px - 1, last_point, x + px, y_max, 5);  
-	  last_point = y_max;
+	
+	if (y_max - y_min < 5) {
+	  float point = (y_min + y_max) / 2;
+	  draw_thick_line(x + px - 1, last_point, x + px, point, thickness);
+	  last_point = point;
+	} else {
+	  draw_thick_line(x + px, y_max, x + px, y_min, thickness);
+	  if (points[px+1] - minv < points[px+1] - maxv) {
+		last_point = y_max;
+	  } else {
+		last_point = y_min;
+	  }
 	}
+
+	/* if (y_min == y_max) { */
+	/*   /\* printf("%d %f %d %f\n", x + px - 1, last_point, x + px, y_max); *\/ */
+	/*   /\* draw_thick_line(x + px - 1, last_point, x + px, y_max, 5);   *\/ */
+	/*   /\* last_point = y_max; *\/ */
+	/* } */
   }
 }
 
@@ -165,7 +178,6 @@ static void draw_circle(float x, float y, float h, float w, float start_angle, f
 
   float rad_start = start_angle * (M_PI / 180.0f);
   float rad_end = end_angle * (M_PI / 180.0f);
-  /* draw_thick_line(c_x, c_y, c_x+(r*cosf(rad_end)), c_y+(r*sinf(rad_end)), 5); */
 
   int segments = (int)(r * 1.5f);
   if (segments < 16) {
@@ -242,11 +254,8 @@ void handle_custom(Clay_BoundingBox bbox, Clay_CustomRenderData *config) {
 			config->backgroundColor.b / 255.0f,
 			config->backgroundColor.a / 255.0f);
 	sgl_begin_triangle_strip();
-	/* draw_thick_line(bbox.x, bbox.y, */
-	/* 				bbox.x+bbox.width, bbox.y+bbox.height, */
-	/* 				20); */
 	draw_wave_screen(bbox.x, bbox.y,
-					 bbox.height, bbox.width,
+					 bbox.height, bbox.width, wave_data.thickness,
 					 wave_data.point_buffer, wave_data.buffer_len);
 	sgl_end();
 

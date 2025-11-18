@@ -119,7 +119,7 @@ int init_sounds(AppState *state) {
       .param_change =
 	  {
 		.param_type = PARAM_OSC,
-		.value = OSC_SAW,
+		.value = OSC_SINE,
 	  },
 	},
 	{
@@ -365,6 +365,7 @@ sapp_desc sokol_main(int argc, char **argv) {
     .window_title = "crynth",
     .width = DEFAULT_DIMENSIONS_WIDTH,
     .height = DEFAULT_DIMENSIONS_HEIGHT,
+	.high_dpi = true,
     .logger.func = slog_func,
   };
 }
