@@ -119,7 +119,7 @@ int init_sounds(AppState *state) {
       .param_change =
 	  {
 		.param_type = PARAM_OSC,
-		.value = OSC_SQUARE,
+		.value = OSC_SAW,
 	  },
 	},
 	{

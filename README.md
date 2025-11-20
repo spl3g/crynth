@@ -5,7 +5,7 @@
 
 <p>
 <img width="322" alt="image" align="left" src="https://github.com/user-attachments/assets/a4c15c52-fae5-4ba2-be4b-c37b7ab36ba4" />
-Just a crappy synth using alsa and SDL3. Works only on linux.
+Just a crappy synth using alsa and sokol. Works only on linux.
 </p>
 <br/>
 <br/>
@@ -22,7 +22,10 @@ nix run github:spl3g/crynth
 ```
 
 For other systems you have to have these libraries:
-- sdl3
+- libGL
+- libX11
+- libXi
+- libXcursor
 - asoundlib
 
 ```sh
