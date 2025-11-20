@@ -12,6 +12,12 @@ typedef struct {
   float y;
 } Vec2;
 
+typedef struct {
+  Vec2 point;
+  float angle;
+} WavePoint;
+
+
 static float _SIN_FULL[128] = {
   0.000000f, 0.049068f, 0.098017f, 0.146730f, 
   0.195090f, 0.242980f, 0.290285f, 0.336890f, 
@@ -86,16 +92,10 @@ static float STEP = (float)STEP_AMOUNT / 360.0f;
 
 
 static void draw_thick_line(float x1, float y1, float x2, float y2, float thickness) {
-  float rad = atan2f(y2 - y1, x2 - x1);
+  float rad = atan2f(y2 - y1, x2 - x1) + M_PI;
 
   float xoffset = -1 * thickness * sinf(rad);
-  if (rad < 0) {
-	xoffset *= -1;
-  }
   float yoffset = thickness * cosf(rad);
-  if (rad < 0) {
-	yoffset *= -1;
-  }
 
   /* float xoffset = sqrtf(powf(thickness, 2) * (1.0f - powf(sinf(M_PI / 2 - rad), 2))); */
   /* float yoffset = thickness * sinf(M_PI / 2 - rad); */
@@ -103,7 +103,6 @@ static void draw_thick_line(float x1, float y1, float x2, float y2, float thickn
   /* 	xoffset *= -1; */
   /* 	yoffset *= -1; */
   /* } */
-  /* printf("rad: %f, x: %f, y: %f\n", rad, xoffset, yoffset); */
 
   float x1top = x1 - xoffset;
   float y1top = y1 - yoffset;
@@ -116,12 +115,6 @@ static void draw_thick_line(float x1, float y1, float x2, float y2, float thickn
 
   float x2bottom = x2 + xoffset;
   float y2bottom = y2 + yoffset;
-  /* printf("1t: (%f %f) 2t: (%f %f)\n" */
-  /* 		 "1b: (%f %f) 2b: (%f %f)\n", */
-  /* 		 x1top, y1top, */
-  /* 		 x2top, y2top, */
-  /* 		 x1bottom, y1bottom, */
-  /* 		 x2bottom, y2bottom), */
 
   sgl_v2f(x1top, y1top);
   sgl_v2f(x1top, y1top);
@@ -131,10 +124,23 @@ static void draw_thick_line(float x1, float y1, float x2, float y2, float thickn
   sgl_v2f(x2bottom, y2bottom);
 }
 
+/* static void _draw_thick_points(WavePoint points[3], int thickness) { */
+/* } */
+
 static void draw_wave_screen(float x, float y, float h, float w, int thickness, float *points, size_t len) {
   float samples_per_px = (float)len / w;
 
-  float last_point = y + h * (0.5f - 0.5f * points[0]);
+  WavePoint wave_points[(int)w*4];
+
+  wave_points[0] = (WavePoint){
+	.point = (Vec2){
+	  .x = x,
+	  .y = y + h * (0.5f - 0.5f * points[0]),
+	},
+	.angle = 0,
+  };
+
+  int point_len = 1;
   for (int px = 1; px < (int)w; px++) {
 	size_t start = (size_t)(px * samples_per_px);
 	size_t end   = (size_t)((px + 1) * samples_per_px);
@@ -151,22 +157,83 @@ static void draw_wave_screen(float x, float y, float h, float w, int thickness, 
 	
 	if (y_max - y_min < 5) {
 	  float point = (y_min + y_max) / 2;
-	  draw_thick_line(x + px - 1, last_point, x + px, point, thickness);
-	  last_point = point;
+	  wave_points[point_len++] = (WavePoint){
+		.point = (Vec2){x+px, point},
+	  };
 	} else {
-	  draw_thick_line(x + px, y_max, x + px, y_min, thickness);
+	  float line[4];
+	  float ydel = (y_max - y_min);
+
 	  if (points[px+1] - minv < points[px+1] - maxv) {
-		last_point = y_max;
+		line[0] = y_min;
+		line[1] = ydel / 15 + y_min;
+		line[2] = ydel * 14 / 15 + y_min;
+		line[3] = y_max;
 	  } else {
-		last_point = y_min;
+		line[0] = y_max;
+		line[1] = ydel * 14 / 15 + y_min;
+		line[2] = ydel / 15 + y_min;
+		line[3] = y_min;
+	  }
+
+	  for (int i = 0; i < 4; i++) {
+		wave_points[point_len++] = (WavePoint){
+		  .point = (Vec2){x+px, line[i]},
+		};
 	  }
 	}
+  }
 
-	/* if (y_min == y_max) { */
-	/*   /\* printf("%d %f %d %f\n", x + px - 1, last_point, x + px, y_max); *\/ */
-	/*   /\* draw_thick_line(x + px - 1, last_point, x + px, y_max, 5);   *\/ */
-	/*   /\* last_point = y_max; *\/ */
-	/* } */
+  /* float step = len / w; */
+
+  for (int i = 1; i < point_len; i++) {
+	/* int i = px * step; */
+
+	/* Vec2 p = { */
+	/*   .x = x + i, */
+	/*   .y = y + h * (0.5f - 0.5f * points[i]), */
+	/* }; */
+	Vec2 p = wave_points[i].point;
+	Vec2 pp = wave_points[i-1].point;
+
+	Vec2 pn = wave_points[i+1].point;
+
+	/* Vec2 pn = { */
+	/*   .x = x + i + 1, */
+	/*   .y = y + h * (0.5f - 0.5f * points[(int)((i + 1) * step)]), */
+	/* }; */
+
+	float next_angle = atan2f(pn.y - p.y, pn.x - p.x) + M_PI;
+	float prev_angle = atan2f(p.y - pp.y, p.x - pp.x) + M_PI;
+	float angle = (prev_angle + next_angle) / 2;
+
+	Vec2 poffset = {
+	  .x = -1 * thickness * sinf(wave_points[i-1].angle),
+	  .y = thickness * cosf(wave_points[i-1].angle),
+	};
+
+	
+	Vec2 coffset = {
+	  .x = -1 * thickness * sinf(angle),
+	  .y = thickness * cosf(angle),
+	};
+
+	if (i == 1) {
+	  sgl_v2f(pp.x - poffset.x, pp.y - poffset.y);
+	}
+	sgl_v2f(pp.x - poffset.x, pp.y - poffset.y);
+	sgl_v2f(p.x - coffset.x, p.y - coffset.y);
+	sgl_v2f(pp.x + poffset.x, pp.y + poffset.y);
+	sgl_v2f(p.x + coffset.x, p.y + coffset.y);
+
+	if (i == (int)w - 1) {
+	  sgl_v2f(p.x + coffset.x, p.y + coffset.y);
+	}
+
+	wave_points[i] = (WavePoint){
+	  .point = p,
+	  .angle = angle,
+	};
   }
 }
 

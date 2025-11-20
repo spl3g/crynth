@@ -298,7 +298,7 @@ void draw_screen(UIData *ui_data) {
   wave->wave_screen = (WaveScreenData){
 	.point_buffer = ui_data->wave_buffer,
 	.buffer_len = ui_data->wave_buffer_size,
-	.thickness = 2,
+	.thickness = 1,
   };
 
   CLAY(CLAY_ID("wave_border"), {
@@ -312,9 +312,9 @@ void draw_screen(UIData *ui_data) {
 		.custom = {
 		  .customData = wave,
 		},
-		.clip = {
-		  .horizontal = true,
-		},
+		/* .clip = { */
+		/*   .horizontal = true, */
+		/* }, */
 	  });
   }
 }
