@@ -41,10 +41,10 @@ typedef struct {
 typedef struct {
   Arena frame_arena;
   PointerState pointer;
+  sclay_font_t fonts[1];
   
   KeyState *keys;
   size_t keys_amount;
-
   KnobSettings knob_settings;
   
   snd_pcm_t *sound_device;
@@ -171,7 +171,7 @@ void HandleClayErrors(Clay_ErrorData errorData) {
   printf("%s", errorData.errorText.chars);
 }
 
-int init_ui() {
+int init_ui(AppState *state) {
   sg_setup(&(sg_desc){
     .environment = sglue_environment(),
     .logger.func = slog_func,
@@ -181,7 +181,13 @@ int init_ui() {
   });
   sclay_setup();
 
-  sclay_add_font("resources/Roboto-Regular.ttf");
+  int font = sclay_add_font("resources/Roboto-Regular.ttf");
+  if (font == FONS_INVALID) {
+	printf("Could not load font");
+	return 1;
+  }
+  state->fonts[0] = font;
+  
   sclay_set_custom_element_cb(handle_custom);
 
   size_t totalMemorySize = Clay_MinMemorySize();
@@ -191,7 +197,8 @@ int init_ui() {
   };
 
   Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) sapp_width(), (float) sapp_height() }, (Clay_ErrorHandler) { HandleClayErrors, 0});
-  Clay_SetMeasureTextFunction(sclay_measure_text, NULL);
+  Clay_SetMeasureTextFunction(sclay_measure_text, state->fonts);
+  Clay_SetDebugModeEnabled(true);
   
   return 0;
 }
@@ -219,7 +226,7 @@ static void init(void *app_state) {
   state->keys = keys;
   state->keys_amount = sizeof(keys)/sizeof(keys[0]);
 
-  if (init_ui() != 0) {
+  if (init_ui(state) != 0) {
 	printf("Couldn't initialize UI");
 	sapp_quit();
   }
@@ -262,7 +269,7 @@ void fill_ui_data(UIData *ui_data, AppState *state) {
   ui_data->keys_amount = state->keys_amount;
 
   ui_data->knob_settings = &state->knob_settings;
-  ui_data->scale = dimensions.width / DEFAULT_DIMENSIONS_WIDTH;  
+  ui_data->scale = dimensions.width / DEFAULT_DIMENSIONS_WIDTH;
 }
 
 static void frame(void *app_state) {
@@ -287,7 +294,7 @@ static void frame(void *app_state) {
   sgl_matrix_mode_modelview();
   sgl_load_identity();
 
-  sclay_render(render_commands, NULL);
+  sclay_render(render_commands, state->fonts);
 
   sgl_draw();
   sg_end_pass();

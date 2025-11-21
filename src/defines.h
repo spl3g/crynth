@@ -13,5 +13,8 @@ static const int FONT_ID = 0;
 
 #define DEFAULT_DIMENSIONS_HEIGHT 720
 #define DEFAULT_DIMENSIONS_WIDTH 1280
+#define DEFAULT_FONT_SIZE 12
+
+#define USE_LABELS
 
 #endif // DEFINES_H_

@@ -1,5 +1,22 @@
 #include "ui.h"
 
+#ifdef USE_LABELS
+#define CLAY_ADD_LABEL(label, scale, component) \
+  CLAY(CLAY_ID(label"_label_container"), { \
+  	.layout = { \
+  	  .layoutDirection = CLAY_TOP_TO_BOTTOM, \
+  	  .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER }, \
+  	  .childGap = 2 * scale, \
+  	}, \
+  }) { \
+    component;															\
+    CLAY_TEXT(CLAY_STRING(label), CLAY_TEXT_CONFIG({ .fontSize = DEFAULT_FONT_SIZE * scale, .textColor = COLOR_FG })); \
+  }
+#else
+#define CLAY_ADD_LABEL(label, scale, component) \
+  component;
+#endif
+
 bool point_is_inside_circle(Clay_Vector2 point, Clay_BoundingBox circle) {
   float center_x = circle.x + circle.width / 2;
   float center_y = circle.y + circle.height / 2;
@@ -312,9 +329,6 @@ void draw_screen(UIData *ui_data) {
 		.custom = {
 		  .customData = wave,
 		},
-		/* .clip = { */
-		/*   .horizontal = true, */
-		/* }, */
 	  });
   }
 }
@@ -327,10 +341,13 @@ void draw_panel(UIData *ui_data) {
 		.childAlignment = {CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER},
 	  },
   }) {
-	CLAY(CLAY_ID("volume_knob_container")) {
-	  draw_knob(CLAY_ID("volume_knob"), ui_data, &ui_data->knob_settings->volume, CLAY_SIZING_FIXED(85 * ui_data->scale), CLAY_SIZING_FIXED(45 * ui_data->scale));
-	}
-
+	CLAY_ADD_LABEL("Volume",
+				   ui_data->scale,
+				   draw_knob(CLAY_ID("volume_knob"),
+							 ui_data,
+							 &ui_data->knob_settings->volume,
+							 CLAY_SIZING_FIXED(85 * ui_data->scale),
+							 CLAY_SIZING_FIXED(45 * ui_data->scale)));
 	draw_screen(ui_data);
 	
 	CLAY(CLAY_ID("envelope_knobs_container"), {
@@ -344,16 +361,40 @@ void draw_panel(UIData *ui_data) {
 			.childGap = 5,
 		  },
 	  }) {
-		draw_knob(CLAY_ID("attack_knob"), ui_data, &ui_data->knob_settings->attack, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
-		draw_knob(CLAY_ID("decay_knob"), ui_data, &ui_data->knob_settings->decay, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
+	    CLAY_ADD_LABEL("Attack",
+					   ui_data->scale,
+					   draw_knob(CLAY_ID("attack_knob"),
+								 ui_data,
+								 &ui_data->knob_settings->attack,
+								 CLAY_SIZING_FIXED(40 * ui_data->scale),
+								 CLAY_SIZING_FIXED(21 * ui_data->scale)));
+	    CLAY_ADD_LABEL("Decay",
+					   ui_data->scale,
+					   draw_knob(CLAY_ID("decay_knob"),
+								 ui_data,
+								 &ui_data->knob_settings->decay,
+								 CLAY_SIZING_FIXED(40 * ui_data->scale),
+								 CLAY_SIZING_FIXED(21 * ui_data->scale)));
 	  }
 	  CLAY(CLAY_ID("envelope_knobs_lower"), {
 		  .layout = {
 			.childGap = 5,
 		  },
 	  }) {
-		draw_knob(CLAY_ID("sustain_knob"), ui_data, &ui_data->knob_settings->sustain, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
-		draw_knob(CLAY_ID("release_knob"), ui_data, &ui_data->knob_settings->release, CLAY_SIZING_FIXED(40 * ui_data->scale), CLAY_SIZING_FIXED(21 * ui_data->scale));
+	    CLAY_ADD_LABEL("Sustain",
+					   ui_data->scale,
+					   draw_knob(CLAY_ID("sustain_knob"),
+								 ui_data,
+								 &ui_data->knob_settings->sustain,
+								 CLAY_SIZING_FIXED(40 * ui_data->scale),
+								 CLAY_SIZING_FIXED(21 * ui_data->scale)));
+		CLAY_ADD_LABEL("Release",
+					   ui_data->scale,
+					   draw_knob(CLAY_ID("release_knob"),
+								 ui_data,
+								 &ui_data->knob_settings->release,
+								 CLAY_SIZING_FIXED(40 * ui_data->scale),
+								 CLAY_SIZING_FIXED(21 * ui_data->scale)));
 	  }
 	}
   };
