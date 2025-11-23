@@ -54,9 +54,52 @@ typedef struct {
 
 typedef float (*OscilatorFunc)(float phase);
 
-float envelope_next(Envelope *env) {
-  bool next_state = false;
+float envelope_handle_attack(Envelope *env) {
+  if (env->current_inc == 0) {
+	env->current_inc = (1.0 - env->current_value) / (float)env->params.attack_time;
+  }
 
+  env->current_value += env->current_inc;
+
+  if (env->counter >= env->params.attack_time) {
+	env->counter = env->current_inc = 0;
+	env->state = ENV_DECAY;
+  }
+
+  return env->current_value;
+}
+
+float envelope_handle_decay(Envelope *env) {
+  if (env->current_inc == 0) {
+	env->current_inc = (1.0 - env->params.sustain_level) / (float)env->params.decay_time;
+  }
+
+  env->current_value -= env->current_inc;
+
+  if (env->counter >= env->params.decay_time) {
+	env->counter = env->current_inc = 0;
+	env->state = ENV_SUSTAIN;
+  }
+
+  return env->current_value;
+}
+
+float envelope_handle_release(Envelope *env) {
+  if (env->current_inc == 0) {
+	env->current_inc = env->params.sustain_level / (float)env->params.release_time;
+  }
+
+  env->current_value -= env->current_inc;
+
+  if (env->counter >= env->params.release_time || env->current_value <= 0) {
+	env->counter = env->current_inc = env->current_value = 0;
+	env->state = ENV_OFF;
+  }
+  
+  return env->current_value;
+}
+
+float envelope_next(Envelope *env) {
   env->counter++;
 
   switch (env->state) {
@@ -64,60 +107,19 @@ float envelope_next(Envelope *env) {
 	return 0;
   }
   case ENV_ATTACK: {
-	if (env->counter >= env->params.attack_time) {
-	  next_state = true;
-	}
-
-	if (env->current_inc == 0) {
-	  env->current_inc = (1.0 - env->current_value) / (float)env->params.attack_time;
-	}
-	
-	env->current_value += env->current_inc;
-	break;
+	return envelope_handle_attack(env);
   }
   case ENV_DECAY: {
-	if (env->counter >= env->params.decay_time) {
-	  next_state = true;
-	}
-
-	if (env->current_inc == 0) {
-	  env->current_inc = (1.0 - env->params.sustain_level) / (float)env->params.decay_time;
-	}
-	
-	env->current_value -= env->current_inc;
-	break;
+	return envelope_handle_decay(env);
   }
   case ENV_SUSTAIN: {
 	env->current_value = env->params.sustain_level;
-	break;
+	return env->current_value;
   }
   case ENV_RELEASE: {
-	if (env->counter >= env->params.release_time) {
-	  env->state = ENV_OFF;
-	  env->counter = env->current_inc = env->current_value = 0;
-	  return 0;
-	}
-
-	if (env->current_inc == 0) {
-	  float from_level;
-	  if (env->params.sustain_level > env->current_value) {
-		from_level = (env->params.sustain_level - env->current_value);
-	  }else {
-		from_level = env->current_value;
-	  }
-	  env->current_inc = from_level / (float)env->params.release_time;
-	}
-	
-	env->current_value -= env->current_inc;
-	break;
+	return envelope_handle_release(env);
   }
   }
-
-  if (next_state) {
-	env->counter = env->current_inc = 0;
-	env->state++;
-  }
-  return env->current_value;
 }
 
 void envelope_note_on(EnvelopeParams params, Envelope *env) {
