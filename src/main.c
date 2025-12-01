@@ -198,7 +198,6 @@ int init_ui(AppState *state) {
 
   Clay_Initialize(clayMemory, (Clay_Dimensions) { (float) sapp_width(), (float) sapp_height() }, (Clay_ErrorHandler) { HandleClayErrors, 0});
   Clay_SetMeasureTextFunction(sclay_measure_text, state->fonts);
-  Clay_SetDebugModeEnabled(true);
   
   return 0;
 }
