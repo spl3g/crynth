@@ -4,7 +4,7 @@
 > Right now you can play some notes with it by pressing keys on the bottom row of your keyboard
 
 <p>
-<img width="322" alt="image" align="left" src="https://github.com/user-attachments/assets/a4c15c52-fae5-4ba2-be4b-c37b7ab36ba4" />
+<img width="322" alt="image" align="left" src="https://github.com/user-attachments/assets/923aa692-953d-466d-ab9b-70353bf7b018" />
 Just a crappy synth using alsa and sokol. Works only on linux.
 </p>
 <br/>
